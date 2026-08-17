@@ -1,0 +1,211 @@
+﻿инлайном
+    Sections/Header.razor                 — .masthead + .stats
+    Modules/Gi/Sections/GiDashboard.razor — секция «Пищеварение»
+      Parts/TrendChart.razor              — svg.trend + .compare
+      Parts/Heatmap.razor                 — .heatmap
+      Parts/DayTimeline.razor             — svg.timeline
+      Parts/SuspectTable.razor            — table.suspects (продукты и свойства)
+      Parts/WindowCalibration.razor       — .calib
+      Parts/ToleratedList.razor           — .chips.clean
+      Parts/SymptomTotals.razor           — .totals
+    Modules/Notes/Sections/Ideas.razor    — .cards
+    Modules/Notes/Sections/Questions.razor— .qlist
+    Sections/RawLog.razor                 — details.rawlog
+
+  Правила: ноль внешних запросов (CSS/SVG инлайн), ноль вычислений в разметке —
+  всё приходит готовым из ViewModel, включая координаты SVG.
+-->
+<style>
+:root{
+  --bg:#faf9f7; --surface:#fff; --surface-2:#f4f2ee; --text:#1a1815; --muted:#6f695d;
+  --border:#e6e2d9; --border-soft:#efece5;
+  --gi:#c2410c; --gi-soft:#fde5d3; --idea:#4338ca; --idea-soft:#e4e3fb;
+  --question:#7c3aed; --question-soft:#ece2fd; --clean:#15803d; --clean-soft:#dcf3e2;
+  --shadow:0 1px 2px rgba(26,24,21,.04), 0 8px 24px -12px rgba(26,24,21,.14);
+  --h0:#f7f4ee; --h1:#f6ddc4; --h2:#f0b183; --h3:#df7a44; --h4:#b93f16;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#131211; --surface:#1c1a18; --surface-2:#242119; --text:#ece8e1; --muted:#9b9387;
+    --border:#332f29; --border-soft:#27241f;
+    --gi:#fb923c; --gi-soft:#3a2213; --idea:#8f97f5; --idea-soft:#1e1f3d;
+    --question:#b294f8; --question-soft:#291d3e; --clean:#5ed37f; --clean-soft:#14301c;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px -14px rgba(0,0,0,.7);
+    --h0:#211e1a; --h1:#43291a; --h2:#6b3c1d; --h3:#9a5220; --h4:#d4762c;
+  }
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--bg); color:var(--text);
+  font-family:ui-sans-serif,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  font-size:15px; line-height:1.6; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1060px; margin:0 auto; padding:56px 28px 96px}
+h1,h2,h3{font-family:ui-serif,Georgia,"Times New Roman",serif; font-weight:600; letter-spacing:-.01em; margin:0}
+
+/* ── шапка ───────────────────────────────────────────────── */
+.masthead{border-bottom:1px solid var(--border); padding-bottom:28px; margin-bottom:36px}
+.eyebrow{font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); margin-bottom:10px}
+.masthead h1{font-size:42px; line-height:1.12}
+.masthead .period{color:var(--muted); font-size:16px; margin-top:8px}
+.stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(128px,1fr)); gap:1px;
+  background:var(--border-soft); border:1px solid var(--border-soft); border-radius:12px; overflow:hidden; margin-top:28px}
+.stat{background:var(--surface); padding:16px 18px}
+.stat b{display:block; font-size:26px; font-weight:600; font-family:ui-serif,Georgia,serif; letter-spacing:-.02em}
+.stat span{font-size:12.5px; color:var(--muted)}
+
+/* ── секции ──────────────────────────────────────────────── */
+section{margin-top:56px}
+.sec-head{display:flex; align-items:baseline; gap:12px; margin-bottom:20px; flex-wrap:wrap}
+.sec-head h2{font-size:26px}
+.sec-head .count{font-size:13px; color:var(--muted); background:var(--surface-2);
+  border:1px solid var(--border-soft); padding:2px 9px; border-radius:99px}
+.sec-head .rule{flex:1; height:1px; background:var(--border); min-width:20px}
+.lead{color:var(--muted); margin:-8px 0 22px; max-width:70ch}
+
+.card{background:var(--surface); border:1px solid var(--border); border-radius:14px;
+  padding:22px 24px; box-shadow:var(--shadow)}
+.card + .card{margin-top:18px}
+.card h3{font-size:16.5px; margin-bottom:14px; display:flex; align-items:baseline; gap:10px; flex-wrap:wrap}
+.card .hint{font-size:12.5px; color:var(--muted); margin-top:12px; margin-bottom:0}
+
+/* ── тренд ───────────────────────────────────────────────── */
+.trend{width:100%; height:auto; display:block}
+.tr-bar{fill:var(--gi); opacity:.32}
+.tr-line{fill:none; stroke:var(--gi); stroke-width:2; stroke-linejoin:round}
+.tr-pt{fill:var(--surface); stroke:var(--gi); stroke-width:2}
+.tr-base{stroke:var(--border); stroke-width:1}
+.tr-lbl{fill:var(--muted); font-size:11px; font-family:inherit}
+.tr-mark{stroke:var(--clean); stroke-width:1.5; stroke-dasharray:4 4}
+.tr-mark-lbl{fill:var(--clean); font-size:11px; font-family:inherit}
+
+.compare{display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:1px;
+  background:var(--border-soft); border:1px solid var(--border-soft); border-radius:12px;
+  overflow:hidden; margin-top:20px}
+.cmp{background:var(--surface); padding:14px 16px}
+.cmp .k{font-size:12px; color:var(--muted)}
+.cmp .v{font-size:20px; font-family:ui-serif,Georgia,serif; letter-spacing:-.02em; margin-top:2px}
+.cmp .d{font-size:12.5px; margin-top:3px; font-variant-numeric:tabular-nums}
+.cmp .d.good{color:var(--clean)} .cmp .d.bad{color:var(--gi)}
+
+/* ── тепловая карта ──────────────────────────────────────── */
+.heatmap{display:grid; grid-auto-flow:column; grid-template-rows:repeat(7,1fr); gap:4px}
+.heatmap i{width:100%; aspect-ratio:1; border-radius:3px; background:var(--h0); display:block}
+.heatmap i.l1{background:var(--h1)} .heatmap i.l2{background:var(--h2)}
+.heatmap i.l3{background:var(--h3)} .heatmap i.l4{background:var(--h4)}
+.hm-legend{display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); margin-top:12px; flex-wrap:wrap}
+.hm-legend i{width:11px; height:11px; border-radius:3px; display:inline-block}
+
+/* ── таймлайн ────────────────────────────────────────────── */
+.timeline{width:100%; height:auto; display:block}
+.tl-axis{fill:var(--muted); font-size:10.5px; font-family:inherit}
+.tl-day{fill:var(--text); font-size:11.5px; font-family:inherit}
+.tl-grid{stroke:var(--border-soft); stroke-width:1}
+.tl-track{stroke:var(--border); stroke-width:1}
+.tl-meal{fill:var(--surface); stroke:var(--muted); stroke-width:1.4}
+.tl-meal.flag{fill:var(--gi-soft); stroke:var(--gi); stroke-width:1.6}
+.tl-sym{fill:var(--gi); opacity:.85}
+.tl-link{stroke:var(--gi); stroke-width:1.4; opacity:.7}
+.tl-link.guess{stroke-dasharray:2 3; opacity:.4}
+.legend{display:flex; flex-wrap:wrap; gap:18px; font-size:12.5px; color:var(--muted); margin-top:14px}
+.legend span{display:flex; align-items:center; gap:7px}
+.dot{width:10px; height:10px; border-radius:50%; border:1.4px solid var(--muted); background:var(--surface)}
+.dot.flag{border-color:var(--gi); background:var(--gi-soft)}
+.bar{width:5px; height:13px; border-radius:1px; background:var(--gi); opacity:.85}
+.ln{width:20px; height:0; border-top:1.4px solid var(--gi); opacity:.7}
+.ln.guess{border-top-style:dashed; opacity:.45}
+
+/* ── таблицы ─────────────────────────────────────────────── */
+table{width:100%; border-collapse:collapse; font-size:14px}
+th{text-align:left; font-weight:500; font-size:11.5px; letter-spacing:.07em; text-transform:uppercase;
+  color:var(--muted); padding:0 10px 10px 0; border-bottom:1px solid var(--border)}
+td{padding:11px 10px 11px 0; border-bottom:1px solid var(--border-soft); vertical-align:middle}
+tr:last-child td{border-bottom:0}
+td.num{font-variant-numeric:tabular-nums; white-space:nowrap}
+.food{font-weight:500}
+.liftbar{position:relative; min-width:104px}
+.liftbar em{position:absolute; inset:0; background:var(--gi); opacity:.16; border-radius:3px}
+.liftbar b{position:relative; font-variant-numeric:tabular-nums; font-weight:600; padding-left:7px; color:var(--gi)}
+.tag{display:inline-block; font-size:11.5px; padding:1px 8px; border-radius:99px;
+  background:var(--surface-2); border:1px solid var(--border-soft); color:var(--muted)}
+.tag.solid{background:var(--gi-soft); border-color:transparent; color:var(--gi)}
+.tag.ok{background:var(--clean-soft); border-color:transparent; color:var(--clean)}
+.conf{font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap}
+.conf b{color:var(--gi); font-weight:600}
+
+.chips{display:flex; flex-wrap:wrap; gap:8px}
+.chips span{border:1px solid var(--border); border-radius:99px; padding:5px 13px; font-size:13.5px; background:var(--surface)}
+.chips.clean span{background:var(--clean-soft); border-color:transparent; color:var(--clean)}
+.chips.clean span b{font-weight:600; font-variant-numeric:tabular-nums; opacity:.75}
+
+.totals{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:14px}
+.total{border:1px solid var(--border); border-radius:12px; padding:14px 16px; background:var(--surface)}
+.total b{display:block; font-size:22px; font-family:ui-serif,Georgia,serif; letter-spacing:-.02em}
+.total span{font-size:12.5px; color:var(--muted)}
+.total .sev{display:block; font-size:12px; color:var(--gi); margin-top:5px}
+
+/* ── калибровка окон ─────────────────────────────────────── */
+.calib{display:grid; gap:12px}
+.cal-row{display:grid; grid-template-columns:130px 1fr 118px; gap:14px; align-items:center; font-size:13.5px}
+.cal-track{position:relative; height:22px; background:var(--surface-2); border-radius:6px; overflow:hidden}
+.cal-def{position:absolute; top:0; bottom:0; background:var(--border); opacity:.85}
+.cal-new{position:absolute; top:0; bottom:0; background:var(--gi); opacity:.5; border-radius:4px}
+.cal-val{color:var(--muted); font-variant-numeric:tabular-nums; text-align:right; font-size:12.5px}
+.cal-scale{display:flex; justify-content:space-between; font-size:11px; color:var(--muted);
+  margin-left:144px; margin-right:132px}
+
+/* ── идеи ────────────────────────────────────────────────── */
+.cards{display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px}
+.idea{background:var(--surface); border:1px solid var(--border); border-left:3px solid var(--idea);
+  border-radius:12px; padding:18px 20px; box-shadow:var(--shadow)}
+.idea h3{font-size:16px; margin-bottom:8px; line-height:1.35; display:block}
+.idea p{margin:0; color:var(--muted); font-size:14px}
+.idea footer{display:flex; align-items:center; gap:8px; margin-top:14px; font-size:12px; color:var(--muted); flex-wrap:wrap}
+.theme{display:inline-block; font-size:11.5px; padding:1px 9px; border-radius:99px;
+  background:var(--idea-soft); color:var(--idea)}
+.badge-do{font-size:11.5px; padding:1px 9px; border-radius:99px; background:var(--gi-soft); color:var(--gi)}
+.mic{opacity:.55}
+
+/* ── вопросы ─────────────────────────────────────────────── */
+.qgroup{margin-bottom:26px}
+.qgroup > h3{font-size:13px; letter-spacing:.09em; text-transform:uppercase; color:var(--question); margin-bottom:12px; display:block}
+.qlist{list-style:none; margin:0; padding:0}
+.qlist li{display:flex; gap:13px; padding:13px 0; border-bottom:1px solid var(--border-soft)}
+.qlist li:last-child{border-bottom:0}
+.qlist .box{flex:none; width:16px; height:16px; margin-top:3px; border:1.5px solid var(--border);
+  border-radius:4px; background:var(--surface)}
+.qlist .q{font-size:14.5px}
+.qlist .a{display:block; color:var(--muted); font-size:13.5px; margin-top:5px; padding-left:11px;
+  border-left:2px solid var(--question-soft)}
+.qlist time{flex:none; margin-left:auto; color:var(--muted); font-size:12px; font-variant-numeric:tabular-nums}
+
+/* ── сноски и лог ────────────────────────────────────────── */
+.note{border:1px solid var(--border); border-left:3px solid var(--muted); border-radius:10px;
+  padding:15px 18px; font-size:13.5px; color:var(--muted); background:var(--surface-2)}
+.note b{color:var(--text); font-weight:600}
+.rawlog{border:1px solid var(--border); border-radius:12px; background:var(--surface); overflow:hidden}
+.rawlog > summary{cursor:pointer; padding:15px 20px; font-size:14px; user-select:none}
+.rawlog > summary::marker{color:var(--muted)}
+.rawlog .log{border-top:1px solid var(--border-soft); padding:6px 20px 16px}
+.entry{display:grid; grid-template-columns:96px 1fr; gap:14px; padding:11px 0; border-bottom:1px solid var(--border-soft)}
+.entry:last-child{border-bottom:0}
+.entry time{color:var(--muted); font-size:12.5px; font-variant-numeric:tabular-nums; padding-top:2px}
+.entry .txt{font-size:14px}
+.entry .meta{font-size:11.5px; color:var(--muted); margin-top:5px; display:flex; gap:8px; flex-wrap:wrap}
+footer.colophon{margin-top:64px; padding-top:22px; border-top:1px solid var(--border);
+  font-size:12.5px; color:var(--muted); display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap}
+
+@media (max-width:700px){
+  .wrap{padding:32px 16px 64px}
+  .masthead h1{font-size:30px}
+  .entry{grid-template-columns:1fr; gap:4px}
+  .cal-row{grid-template-columns:100px 1fr; }
+  .cal-val{grid-column:1/-1; text-align:left}
+  .cal-scale{display:none}
+}
+@media print{
+  :root{--bg:#fff; --surface:#fff; --shadow:none}
+  .wrap{max-width:none; padding:0}
+  section, .card, .idea{break-inside:avoid}
+  .rawlog[open] > summary{display:none}
+}

@@ -1,0 +1,27 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>diary</AssemblyName>
+    <RootNamespace>Diary.Cli</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Diary.Application\Diary.Application.csproj" />
+    <ProjectReference Include="..\Diary.Modules.Gi\Diary.Modules.Gi.csproj" />
+    <ProjectReference Include="..\Diary.Modules.Notes\Diary.Modules.Notes.csproj" />
+    <ProjectReference Include="..\Diary.Infrastructure.Persistence\Diary.Infrastructure.Persistence.csproj" />
+    <ProjectReference Include="..\Diary.Infrastructure.Telegram\Diary.Infrastructure.Telegram.csproj" />
+    <ProjectReference Include="..\Diary.Infrastructure.Speech\Diary.Infrastructure.Speech.csproj" />
+    <ProjectReference Include="..\Diary.Infrastructure.Llm\Diary.Infrastructure.Llm.csproj" />
+    <ProjectReference Include="..\Diary.Infrastructure.Reporting\Diary.Infrastructure.Reporting.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="System.CommandLine" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="appsettings.Local.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('appsettings.Local.json')" />
+  </ItemGroup>
+</Project>
+
+

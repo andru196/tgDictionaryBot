@@ -1,0 +1,37 @@
+// Выдуманные сообщения для отладки пайплайна без Telegram.
+// Запуск: diary run --source file:samples/messages.jsonl --subject sample --report
+{"peer":"@sample","messageId":1001,"senderId":777,"sentAt":"2026-08-03T09:10:00+03:00","text":"Утром овсянка на воде и кофе натощак"}
+{"peer":"@sample","messageId":1002,"senderId":777,"sentAt":"2026-08-03T10:20:00+03:00","text":"Изжога, тройка примерно"}
+{"peer":"@sample","messageId":1003,"senderId":777,"sentAt":"2026-08-03T14:00:00+03:00","text":"На обед гречка с куриной грудкой"}
+{"peer":"@sample","messageId":1004,"senderId":777,"sentAt":"2026-08-03T19:40:00+03:00","text":"Поужинал жарёхой с котлетой, ну и хлеба пару кусков"}
+{"peer":"@sample","messageId":1005,"senderId":777,"sentAt":"2026-08-03T21:30:00+03:00","text":"Изжога, на четвёрку где-то. Это после ужина явно","replyTo":1004}
+{"peer":"@sample","messageId":1006,"senderId":777,"sentAt":"2026-08-04T09:00:00+03:00","text":"Овсянка и кофе"}
+{"peer":"@sample","messageId":1007,"senderId":777,"sentAt":"2026-08-04T13:30:00+03:00","text":"Борщ и хлеб на обед"}
+{"peer":"@sample","messageId":1008,"senderId":777,"sentAt":"2026-08-04T20:00:00+03:00","text":"Слушай, а прикольная мысль — сделать линтер для промптов. Ну то есть промпт это же код по сути, у него версия есть, контракт. И чтобы он ругался, когда в инструкции противоречие. Кстати ужинал пиццей сегодня"}
+{"peer":"@sample","messageId":1009,"senderId":777,"sentAt":"2026-08-04T23:10:00+03:00","text":"Заброс сильный, шестёрка. Спать не могу"}
+{"peer":"@sample","messageId":1010,"senderId":777,"sentAt":"2026-08-05T09:30:00+03:00","text":"Творог и банан"}
+{"peer":"@sample","messageId":1011,"senderId":777,"sentAt":"2026-08-05T14:10:00+03:00","text":"Рис с куриной грудкой, овощи печёные"}
+{"peer":"@sample","messageId":1012,"senderId":777,"sentAt":"2026-08-05T18:50:00+03:00","text":"надо загуглить чем span отличается от memory в дотнете"}
+{"peer":"@sample","messageId":1013,"senderId":777,"sentAt":"2026-08-05T20:30:00+03:00","text":"Гречка и салат из огурцов"}
+{"peer":"@sample","messageId":1014,"senderId":777,"sentAt":"2026-08-06T08:40:00+03:00","text":"Кофе натощак опять"}
+{"peer":"@sample","messageId":1015,"senderId":777,"sentAt":"2026-08-06T09:40:00+03:00","text":"Изжога с утра, четвёрка. Наверное от кофе"}
+{"peer":"@sample","messageId":1016,"senderId":777,"sentAt":"2026-08-06T13:00:00+03:00","text":"Взял шаурму на обед, знаю что зря"}
+{"peer":"@sample","messageId":1017,"senderId":777,"sentAt":"2026-08-06T16:20:00+03:00","text":"Вздутие сильное, пятёрка. И урчит"}
+{"peer":"@sample","messageId":1018,"senderId":777,"sentAt":"2026-08-06T20:10:00+03:00","text":"Ужин — картошка жареная и котлета"}
+{"peer":"@sample","messageId":1019,"senderId":777,"sentAt":"2026-08-06T22:40:00+03:00","text":"Опять изжога, пятёрка"}
+{"peer":"@sample","messageId":1020,"senderId":777,"sentAt":"2026-08-07T09:00:00+03:00","text":"Овсянка на воде"}
+{"peer":"@sample","messageId":1021,"senderId":777,"sentAt":"2026-08-07T14:00:00+03:00","text":"Гречка, куриная грудка, печёные овощи"}
+{"peer":"@sample","messageId":1022,"senderId":777,"sentAt":"2026-08-07T19:00:00+03:00","text":"Стейк и салат"}
+{"peer":"@sample","messageId":1023,"senderId":777,"sentAt":"2026-08-07T21:15:00+03:00","text":"интересно, а как в SQLite вообще WAL работает"}
+{"peer":"@sample","messageId":1024,"senderId":777,"sentAt":"2026-08-08T10:00:00+03:00","text":"Яичница и кофе"}
+{"peer":"@sample","messageId":1025,"senderId":777,"sentAt":"2026-08-08T14:30:00+03:00","text":"Плов на обед"}
+{"peer":"@sample","messageId":1026,"senderId":777,"sentAt":"2026-08-08T20:00:00+03:00","text":"Пиво выпил, бутылку. Вчера вечером ещё картошку жарил, забыл записать"}
+{"peer":"@sample","messageId":1027,"senderId":777,"sentAt":"2026-08-08T22:00:00+03:00","text":"Заброс, семёрка. Наверное после пива"}
+{"peer":"@sample","messageId":1028,"senderId":777,"sentAt":"2026-08-09T11:00:00+03:00","text":"Сырники со сметаной"}
+{"peer":"@sample","messageId":1029,"senderId":777,"sentAt":"2026-08-09T16:00:00+03:00","text":"Плов и овощи гриль"}
+{"peer":"@sample","messageId":1030,"senderId":777,"sentAt":"2026-08-09T19:30:00+03:00","text":"Надо бы написать статью про Result вместо исключений в API, с примерами где это реально помогает а где превращается в лапшу"}
+{"peer":"@sample","messageId":1031,"senderId":777,"sentAt":"2026-08-10T09:15:00+03:00","text":"Овсянка, банан"}
+{"peer":"@sample","messageId":1032,"senderId":777,"sentAt":"2026-08-10T13:40:00+03:00","text":"Рис с курицей"}
+{"peer":"@sample","messageId":1033,"senderId":777,"sentAt":"2026-08-10T20:00:00+03:00","text":"Жареная картошка на ужин, опять не удержался"}
+{"peer":"@sample","messageId":1034,"senderId":777,"sentAt":"2026-08-10T22:20:00+03:00","text":"Изжога, шестёрка","replyTo":1033}
+{"peer":"@sample","messageId":1035,"senderId":999,"sentAt":"2026-08-10T22:30:00+03:00","text":"Это сообщение от постороннего отправителя — должно уйти в карантин"}

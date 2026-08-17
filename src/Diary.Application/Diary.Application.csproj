@@ -1,0 +1,16 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\Diary.Domain\Diary.Domain.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Проверки конфигурации и разбор хэштегов тестируются напрямую: это внутренние
+         детали ядра, но именно те, ошибка в которых проявится не сразу. -->
+    <InternalsVisibleTo Include="Diary.Application.Tests" />
+  </ItemGroup>
+</Project>
+

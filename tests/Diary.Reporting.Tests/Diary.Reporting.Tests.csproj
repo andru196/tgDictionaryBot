@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsTestProject>true</IsTestProject>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Diary.Infrastructure.Reporting\Diary.Infrastructure.Reporting.csproj" />
+    <ProjectReference Include="..\..\src\Diary.Modules.Gi\Diary.Modules.Gi.csproj" />
+    <ProjectReference Include="..\..\src\Diary.Modules.Notes\Diary.Modules.Notes.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="Shouldly" />
+    <PackageReference Include="NSubstitute" />
+  </ItemGroup>
+</Project>
+

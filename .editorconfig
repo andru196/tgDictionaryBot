@@ -14,6 +14,12 @@ indent_size = 2
 [*.md]
 trim_trailing_whitespace = false
 
+# Имена тестов — предложения, а не идентификаторы API: подчёркивание отделяет
+# условие от ожидаемого поведения и читается в отчёте о прогоне.
+[tests/**/*.cs]
+dotnet_diagnostic.CA1707.severity = none
+dotnet_diagnostic.CA1861.severity = none
+
 [*.cs]
 # using-директивы
 dotnet_sort_system_directives_first = true
@@ -43,3 +49,11 @@ dotnet_naming_style.underscore_camel.capitalization = camel_case
 dotnet_diagnostic.CA2007.severity = none          # ConfigureAwait не нужен в хосте без SyncContext
 dotnet_diagnostic.CA1848.severity = none          # LoggerMessage-делегаты — по желанию
 dotnet_diagnostic.CA1062.severity = none          # nullable reference types вместо ручных проверок
+dotnet_diagnostic.CA1873.severity = none          # то же, что CA1848: батчевой утилите не критично
+dotnet_diagnostic.CA1716.severity = none          # совместимость имён с VB — не наш случай
+dotnet_diagnostic.CA1308.severity = none          # ToLowerInvariant осознанно: ключи, а не отображение
+dotnet_diagnostic.CA1031.severity = none          # шаг пайплайна не должен ронять прогон из-за одной записи
+dotnet_diagnostic.CA1812.severity = none          # классы инстанцируются через DI
+dotnet_diagnostic.CA1515.severity = none          # публичные типы в src — это и есть API модулей
+dotnet_diagnostic.CA1822.severity = none          # сервисы инстансные намеренно: их подменяют через DI
+dotnet_diagnostic.CA1859.severity = none          # интерфейс в сигнатуре читается лучше, чем List<T>

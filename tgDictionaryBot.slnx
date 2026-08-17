@@ -1,0 +1,20 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Diary.Application/Diary.Application.csproj" />
+    <Project Path="src/Diary.Cli/Diary.Cli.csproj" />
+    <Project Path="src/Diary.Domain/Diary.Domain.csproj" />
+    <Project Path="src/Diary.Infrastructure.Llm/Diary.Infrastructure.Llm.csproj" />
+    <Project Path="src/Diary.Infrastructure.Persistence/Diary.Infrastructure.Persistence.csproj" />
+    <Project Path="src/Diary.Infrastructure.Reporting/Diary.Infrastructure.Reporting.csproj" />
+    <Project Path="src/Diary.Infrastructure.Speech/Diary.Infrastructure.Speech.csproj" />
+    <Project Path="src/Diary.Infrastructure.Telegram/Diary.Infrastructure.Telegram.csproj" />
+    <Project Path="src/Diary.Modules.Gi/Diary.Modules.Gi.csproj" />
+    <Project Path="src/Diary.Modules.Notes/Diary.Modules.Notes.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Diary.Application.Tests/Diary.Application.Tests.csproj" />
+    <Project Path="tests/Diary.Domain.Tests/Diary.Domain.Tests.csproj" />
+    <Project Path="tests/Diary.Modules.Gi.Tests/Diary.Modules.Gi.Tests.csproj" />
+    <Project Path="tests/Diary.Reporting.Tests/Diary.Reporting.Tests.csproj" />
+  </Folder>
+</Solution>
