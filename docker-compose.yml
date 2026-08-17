@@ -1,0 +1,95 @@
+# Дневник в контейнере.
+#
+# Модель по умолчанию берётся с хоста: LM Studio — приложение с интерфейсом,
+# в контейнер оно не помещается, да и держать веса в двух местах незачем.
+# Профиль `bundled` поднимает Ollama в контейнере, если хочется автономности.
+#
+#   docker compose run --rm diary sync --source file:samples/messages.jsonl
+#   docker compose run --rm diary extract
+#   docker compose run --rm diary report --period month --compare
+#   docker compose run --rm tests
+#
+# Первый вход в Telegram спросит код — поэтому именно `run`, а не `up`:
+# нужен терминал.
+
+x-diary-common: &diary-common
+  build:
+    context: .
+    target: runtime
+  image: tgdictionarybot:local
+  env_file:
+    - path: .env
+      required: false
+  environment:
+    # Из контейнера хост виден по этому имени; для Linux оно добавлено в extra_hosts.
+    DIARY_Llm__Endpoint: ${DIARY_LLM_ENDPOINT:-http://host.docker.internal:1234/v1}
+    DIARY_Llm__Roles__Segmentation__Model: ${DIARY_MODEL:-qwen/qwen3.5-9b}
+    DIARY_Llm__Roles__Extraction__Model: ${DIARY_MODEL:-qwen/qwen3.5-9b}
+    DIARY_Llm__Roles__Answering__Model: ${DIARY_MODEL:-qwen/qwen3.5-9b}
+    # Секреты только через окружение: в образ и в git они попадать не должны.
+    DIARY_Telegram__ApiId: ${DIARY_TELEGRAM_API_ID:-0}
+    DIARY_Telegram__ApiHash: ${DIARY_TELEGRAM_API_HASH:-}
+    DIARY_Telegram__PhoneNumber: ${DIARY_TELEGRAM_PHONE:-}
+    DIARY_Telegram__SessionFile: /app/data/telegram.session
+  volumes:
+    # Данные и отчёты переживают пересборку образа: сырьё дороже кода.
+    - ./data:/app/data
+    - ./reports:/app/reports
+    - ./models:/app/models
+    - ./samples:/app/samples:ro
+    - ./fixtures:/app/fixtures:ro
+    # Субъекты задаются файлом: массивы через переменные окружения нечитаемы.
+    - ./docker/appsettings.Local.json:/app/appsettings.Local.json:ro
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+
+services:
+  # Основной сервис. Всегда через `run`: команды разовые, а не демон.
+  diary:
+    <<: *diary-common
+    stdin_open: true
+    tty: true
+
+  # Прогон тестов в том же окружении, где собирается рабочий образ.
+  tests:
+    build:
+      context: .
+      target: test
+    image: tgdictionarybot:tests
+    profiles: ["tests"]
+    command: ["true"]
+    entrypoint: ["/bin/sh", "-c"]
+
+  # Автономный вариант: модель тоже в контейнере.
+  #   docker compose --profile bundled up -d ollama
+  #   docker compose --profile bundled run --rm diary-bundled extract
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["bundled"]
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  diary-bundled:
+    <<: *diary-common
+    profiles: ["bundled"]
+    stdin_open: true
+    tty: true
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      DIARY_Llm__Endpoint: http://ollama:11434/v1
+      DIARY_Llm__Roles__Segmentation__Model: ${DIARY_BUNDLED_MODEL:-qwen3:8b}
+      DIARY_Llm__Roles__Extraction__Model: ${DIARY_BUNDLED_MODEL:-qwen3:8b}
+      DIARY_Llm__Roles__Answering__Model: ${DIARY_BUNDLED_MODEL:-qwen3:8b}
+      DIARY_Telegram__SessionFile: /app/data/telegram.session
+
+volumes:
+  ollama-models:

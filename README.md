@@ -6,23 +6,51 @@
 
 **Ничего не уходит наружу.** LLM локальная, распознавание локальное, база локальная. Единственное соединение с интернетом — за собственными сообщениями в Telegram.
 
-## Быстрый старт
+## Быстрый старт в Docker
 
-Прогнать весь пайплайн на выдуманных данных, без Telegram и без учётной записи — нужна только запущенная LM Studio с загруженной моделью:
+```bash
+cp .env.example .env && cp docker/appsettings.Local.example.json docker/appsettings.Local.json
+```
+
+Заполнить `.env` (`api_id`/`api_hash` с my.telegram.org) и вписать свой канал в `docker/appsettings.Local.json`. Оба файла в `.gitignore` и в `.dockerignore` — ни в репозиторий, ни в образ они не попадают.
+
+Прогон на выдуманных данных, без Telegram и без учётной записи — нужна только запущенная LM Studio:
+
+```bash
+docker compose run --rm diary sync --source file:samples/messages.jsonl
+```
+
+```bash
+docker compose run --rm diary extract
+```
+
+```bash
+docker compose run --rm diary report --period month --compare
+```
+
+Отчёт появится в `./reports/`, база и голосовые — в `./data/`: тома переживают пересборку образа.
+
+Именно `run`, а не `up`: команды разовые, а первый вход в Telegram спросит код из сообщения — нужен терминал.
+
+Модель по умолчанию берётся с хоста через `host.docker.internal`. Если хочется полной автономности, профиль `bundled` поднимает Ollama рядом:
+
+```bash
+docker compose --profile bundled run --rm diary-bundled extract
+```
+
+Тесты прогоняются в том же образе, где собирается рабочий:
+
+```bash
+docker compose build tests
+```
+
+## Без Docker
 
 ```bash
 dotnet run --project src/Diary.Cli -- sync --source file:samples/messages.jsonl
 ```
 
-```bash
-dotnet run --project src/Diary.Cli -- extract
-```
-
-```bash
-dotnet run --project src/Diary.Cli -- report --period month --compare --open
-```
-
-Для работы с настоящим Telegram: скопировать [docs/appsettings.example.json](docs/appsettings.example.json) в `appsettings.Local.json` рядом с исполняемым файлом, вписать `ApiId`/`ApiHash` с my.telegram.org и свой канал.
+Конфигурация — `appsettings.Local.json` рядом с исполняемым файлом, пример в [docs/appsettings.example.json](docs/appsettings.example.json).
 
 ## Команды
 

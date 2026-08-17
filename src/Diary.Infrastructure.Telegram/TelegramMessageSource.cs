@@ -17,6 +17,13 @@ public sealed class TelegramOptions
 
     public string PhoneNumber { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Пароль двухфакторной аутентификации. Задаётся переменной окружения, а не файлом
+    /// конфигурации: в контейнере терминала может не быть, а спросить его больше негде.
+    /// Пусто — спросим в терминале.
+    /// </summary>
+    public string Password { get; set; } = string.Empty;
+
     /// <summary>Файл сессии равен доступу к аккаунту — обращаться как с паролем.</summary>
     public string SessionFile { get; set; } = "data/telegram.session";
 
@@ -55,14 +62,23 @@ public sealed class TelegramMessageSource : IMessageSource
         "api_hash" => _options.ApiHash,
         "phone_number" => _options.PhoneNumber,
         "session_pathname" => Path.GetFullPath(_options.SessionFile),
-        // Код и пароль спрашиваются у человека: их нельзя ни хранить, ни угадывать.
+        // Код приходит в момент входа — его нельзя ни задать заранее, ни угадать.
         "verification_code" => Prompt("Код из Telegram: "),
-        "password" => Prompt("Пароль двухфакторной аутентификации: "),
+        "password" => string.IsNullOrEmpty(_options.Password)
+            ? Prompt("Пароль двухфакторной аутентификации: ")
+            : _options.Password,
         _ => null,
     };
 
     private static string Prompt(string message)
     {
+        if (Console.IsInputRedirected)
+        {
+            throw new InvalidOperationException(
+                $"Требуется ввод: {message.TrimEnd(' ', ':')}. Терминала нет — запусти команду " +
+                "интерактивно: docker compose run --rm diary sync");
+        }
+
         Console.Write(message);
         return Console.ReadLine() ?? string.Empty;
     }

@@ -14,8 +14,11 @@ models/
 *.wav
 appsettings.Local.json
 appsettings.*.Local.json
+docker/appsettings.Local.json
 secrets.json
 .env
+.env.*
+!.env.example
 
 # --- .NET ---
 bin/
