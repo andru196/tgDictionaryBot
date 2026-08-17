@@ -193,5 +193,11 @@ public static class HostFactory
             using var scope = provider.CreateScope();
             return await scope.ServiceProvider.GetRequiredService<IQuarantineStore>().CountAsync(ct);
         }
+
+        public async Task<int> ClearAsync(CancellationToken ct)
+        {
+            using var scope = provider.CreateScope();
+            return await scope.ServiceProvider.GetRequiredService<IQuarantineStore>().ClearAsync(ct);
+        }
     }
 }

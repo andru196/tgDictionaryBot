@@ -113,12 +113,18 @@ public sealed record MealPayload(IReadOnlyList<FoodItem> Items, MealType Type);
 /// «после вчерашнего борща» — прямое указание на еду в тексте. Даёт связку точнее,
 /// чем попадание в окно, и не требует reply.
 /// </param>
+/// <param name="DelayAfterMeal">
+/// «через два часа» — названная человеком задержка от еды. Тоже точнее окна:
+/// это факт, а не предположение. Живёт здесь, а не в записи о еде, потому что
+/// сегментатор отдаёт эту фразу фрагменту симптома — в куске про еду её просто нет.
+/// </param>
 public sealed record SymptomPayload(
     SymptomKind Kind,
     Severity Severity,
     TimeSpan? Duration,
     string? SuspectedFoodMention,
-    string? Notes);
+    string? Notes,
+    TimeSpan? DelayAfterMeal = null);
 
 public static class GiCategories
 {

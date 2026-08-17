@@ -1,4 +1,4 @@
-using Diary.Application.Ports;
+﻿using Diary.Application.Ports;
 using Diary.Application.Subjects;
 using Diary.Domain;
 using Diary.Modules.Gi.Analysis;
@@ -92,7 +92,9 @@ public sealed class GiAnalysisService(
                 byMessage.TryGetValue(e.SourceMessageId, out var source);
                 return new SymptomObservation(
                     e.Id, e.OccurredAtUtc, payload.Kind, payload.Severity,
-                    payload.SuspectedFoodMention, source.ReplyToTelegramMessageId);
+                    payload.SuspectedFoodMention, source.ReplyToTelegramMessageId,
+                    payload.DelayAfterMeal,
+                    source.TelegramMessageId == 0 ? null : source.TelegramMessageId);
             })
             .OrderBy(s => s.At)
             .ToArray();
@@ -100,3 +102,4 @@ public sealed class GiAnalysisService(
         return (meals, symptoms);
     }
 }
+

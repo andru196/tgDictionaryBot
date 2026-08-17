@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Reflection;
 using Diary.Application.Modules;
 using Diary.Application.Ports;
@@ -35,11 +35,12 @@ internal sealed record SymptomDto(
     int? DurationMinutes,
     string? SuspectedFood,
     string? Notes,
-    TimeDto? Time);
+    TimeDto? Time,
+    int? DelayAfterMealMinutes);
 
 public sealed class MealExtractor(IStructuredCompletion llm) : IEntryExtractor
 {
-    internal const string PromptVersion = "meal-v1";
+    internal const string PromptVersion = "meal-v2";
 
     private static readonly string Prompt =
         PromptLoader.Load(Assembly.GetExecutingAssembly(), "extract-meal.md");
@@ -98,7 +99,7 @@ public sealed class MealExtractor(IStructuredCompletion llm) : IEntryExtractor
 
 public sealed class SymptomExtractor(IStructuredCompletion llm) : IEntryExtractor
 {
-    internal const string PromptVersion = "symptom-v1";
+    internal const string PromptVersion = "symptom-v3";
 
     private static readonly string Prompt =
         PromptLoader.Load(Assembly.GetExecutingAssembly(), "extract-symptom.md");
@@ -118,7 +119,11 @@ public sealed class SymptomExtractor(IStructuredCompletion llm) : IEntryExtracto
             new Severity(Math.Clamp(dto.Severity ?? 4, 0, 10)),
             dto.DurationMinutes is > 0 ? TimeSpan.FromMinutes(dto.DurationMinutes.Value) : null,
             string.IsNullOrWhiteSpace(dto.SuspectedFood) ? null : dto.SuspectedFood!.Trim().ToLowerInvariant(),
-            string.IsNullOrWhiteSpace(dto.Notes) ? null : dto.Notes!.Trim());
+            string.IsNullOrWhiteSpace(dto.Notes) ? null : dto.Notes!.Trim(),
+            // Двое суток — потолок разумного: всё, что больше, скорее выдумка модели.
+            dto.DelayAfterMealMinutes is > 0 and <= 2880
+                ? TimeSpan.FromMinutes(dto.DelayAfterMealMinutes.Value)
+                : null);
 
         var (at, certainty) = context.TimeResolver.Resolve(
             dto.Time?.ToSpec() ?? RelativeTimeSpec.Now, context.SentAtUtc);
@@ -128,3 +133,5 @@ public sealed class SymptomExtractor(IStructuredCompletion llm) : IEntryExtracto
             fragment.Text, fragment.Confidence, payload, $"{context.ExtractorVersion}/{PromptVersion}");
     }
 }
+
+

@@ -69,6 +69,12 @@ public interface IQuarantineStore
     Task<IReadOnlyList<QuarantinedMessage>> GetAllAsync(CancellationToken ct);
 
     Task<int> CountAsync(CancellationToken ct);
+
+    /// <summary>
+    /// Очищает карантин перед повторным проходом. Сами сообщения перечитываются
+    /// из Telegram — здесь лежит только след, без медиа.
+    /// </summary>
+    Task<int> ClearAsync(CancellationToken ct);
 }
 
 /// <summary>Журнал удалений: даже если файл потом потеряется, видно, что исчезло и когда.</summary>

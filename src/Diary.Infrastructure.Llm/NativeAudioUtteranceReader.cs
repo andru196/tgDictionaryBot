@@ -44,15 +44,32 @@ public sealed class NativeAudioUtteranceReader(
         var wav = Convert.ToBase64String(ToWav(samples));
         var role = _llm.For(LlmRole.Extraction);
 
-        var reply = await client.SendAsync(
-            new ChatRequest
-            {
-                Model = string.IsNullOrWhiteSpace(_speech.NativeAudioModel) ? role.Model : _speech.NativeAudioModel,
-                Messages = [ChatMessagePayload.WithAudio("user", Instruction, wav)],
-                Temperature = 0.0f,
-                ReasoningEffort = _llm.DisableThinking ? _llm.ReasoningEffort : null,
-            },
-            ct);
+        ChatReply reply;
+        try
+        {
+            reply = await client.SendAsync(
+                new ChatRequest
+                {
+                    Model = string.IsNullOrWhiteSpace(_speech.NativeAudioModel)
+                        ? role.Model
+                        : _speech.NativeAudioModel,
+                    Messages = [ChatMessagePayload.WithAudio("user", Instruction, wav)],
+                    Temperature = 0.0f,
+                    ReasoningEffort = _llm.DisableThinking ? _llm.ReasoningEffort : null,
+                },
+                ct);
+        }
+        catch (StructuredCompletionException ex) when (ex.RawResponse?.Contains("image_url", StringComparison.Ordinal) == true)
+        {
+            // Проверено на LM Studio 17.08.2026: сервер принимает только text и image_url,
+            // отдельного audio/transcriptions у него нет. Загрузить омни-модель мало —
+            // звук до неё не доедет.
+            throw new NotSupportedException(
+                "Сервер не принимает аудио: его API знает только text и image_url. " +
+                "Нативное аудио требует другого сервера (vLLM, llama.cpp с mmproj). " +
+                "Для LM Studio оставь Speech:Reader = Whisper.",
+                ex);
+        }
 
         // Уверенности мультимодальная модель не сообщает; ставим срединное значение,
         // чтобы гибридный режим не считал такую расшифровку заведомо надёжной.

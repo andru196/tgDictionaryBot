@@ -206,4 +206,12 @@ public sealed class QuarantineStore(SyncDbContext db) : IQuarantineStore
             .ToListAsync(ct);
 
     public Task<int> CountAsync(CancellationToken ct) => db.Quarantine.CountAsync(ct);
+
+    public async Task<int> ClearAsync(CancellationToken ct)
+    {
+        var rows = await db.Quarantine.ToListAsync(ct);
+        db.Quarantine.RemoveRange(rows);
+        await db.SaveChangesAsync(ct);
+        return rows.Count;
+    }
 }

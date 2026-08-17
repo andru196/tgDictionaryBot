@@ -17,7 +17,9 @@ public sealed record SymptomObservation(
     SymptomKind Kind,
     Severity Severity,
     string? SuspectedFoodMention,
-    long? ReplyToTelegramMessageId);
+    long? ReplyToTelegramMessageId,
+    TimeSpan? DelayAfterMeal = null,
+    long? SourceTelegramMessageId = null);
 
 /// <summary>Насколько надёжно связаны приём пищи и симптом.</summary>
 public enum LinkKind
@@ -28,12 +30,19 @@ public enum LinkKind
     /// <summary>«После вчерашнего борща» — прямое упоминание в тексте.</summary>
     TextualReference = 1,
 
+    /// <summary>
+    /// «Через два часа стало плохо» — человек сам назвал задержку. Какую именно еду
+    /// он имел в виду, приходится вычислить, но сам интервал — факт, а не догадка.
+    /// </summary>
+    StatedDelay = 2,
+
     /// <summary>Попадание в окно экспозиции. Основная масса связок.</summary>
-    TemporalWindow = 2,
+    TemporalWindow = 3,
 }
 
 public sealed record MealSymptomLink(EntryId MealId, EntryId SymptomId, LinkKind Kind, double Weight, TimeSpan Lag)
 {
     /// <summary>Связка опирается на факт, а не на предположение о времени.</summary>
-    public bool IsConfirmed => Kind is LinkKind.Reply or LinkKind.TextualReference;
+    public bool IsConfirmed =>
+        Kind is LinkKind.Reply or LinkKind.TextualReference or LinkKind.StatedDelay;
 }

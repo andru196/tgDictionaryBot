@@ -175,6 +175,9 @@ setupChat.SetAction((parse, ct) => CreateRunner(parse).SetupChatAsync(
     parse.GetValue(keyOption)!,
     ct));
 
+var requeue = new Command("requeue", "Вернуть в обработку то, что осело в карантине.");
+requeue.SetAction((parse, ct) => CreateRunner(parse).RequeueAsync(ct));
+
 var status = new Command("status", "Что накоплено, в каком состоянии и что в карантине.");
 var detailsOption = new Option<bool>("--details")
 {
@@ -211,7 +214,7 @@ reprocess.SetAction((parse, ct) => CreateRunner(parse).ReprocessAsync(
     parse.GetValue(subjectOption), parse.GetValue(fromStateOption)!, parse.GetValue(sinceOption), ct));
 
 foreach (var command in new[]
-         { sync, transcribe, extract, report, run, answer, eval, status, retention, reprocess, watch, setupChat })
+         { sync, transcribe, extract, report, run, answer, eval, status, retention, reprocess, watch, setupChat, requeue })
 {
     root.Subcommands.Add(command);
 }
@@ -246,4 +249,5 @@ static Granularity ParseGranularity(string? value) =>
         "month" => Granularity.Month,
         _ => Granularity.Week,
     };
+
 

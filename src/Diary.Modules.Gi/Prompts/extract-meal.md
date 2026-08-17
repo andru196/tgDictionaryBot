@@ -20,7 +20,10 @@
 - `dayOffset` — 0 сегодня, -1 вчера, -2 позавчера.
 - `partOfDay` — `Morning`, `Noon`, `Afternoon`, `Evening`, `Night` или null.
 - `localTime` — «в семь утра» → `07:00`. Формат `HH:mm`. Иначе null.
-- `hoursAgo` — «часа два назад» → 2. Иначе null.
+- `hoursAgo` — сколько часов назад это было съедено: «часа два назад пообедал» → 2.
+  Сюда же попадает оборот «съел X, через N часов стало плохо»: раз человек рассказывает
+  об этом уже после симптома, еда была примерно N часов назад → `hoursAgo` = N.
+  Иначе null.
 
 ## Теги
 
@@ -46,3 +49,7 @@
 Вход: «Вчера вечером ещё картошку жарил, забыл записать»
 Выход:
 {"items":[{"canonical":"картофель жареный","raw":"картошку жарил","quantity":null,"tags":["Fried","Fatty"]}],"mealType":"Dinner","time":{"dayOffset":-1,"partOfDay":"Evening","localTime":null,"hoursAgo":null}}
+
+Вход: «Съел большую фокаччу, а также немножко яичницы. Через два часа пронесло»
+Выход:
+{"items":[{"canonical":"фокачча","raw":"большую фокаччу","quantity":"большая","tags":["Gluten","Fatty"]},{"canonical":"яичница","raw":"немножко яичницы","quantity":"немного","tags":["Fatty"]}],"mealType":"Unspecified","time":{"dayOffset":null,"partOfDay":null,"localTime":null,"hoursAgo":2}}

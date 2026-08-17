@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using Diary.Application.Evaluation;
 using Diary.Application.Ports;
 using Diary.Application.Subjects;
@@ -51,6 +51,53 @@ public sealed class Runner(IHost host)
 
         await ExecuteCommandsAsync(report.Commands, ct);
         return 0;
+    }
+
+    /// <summary>
+    /// Возвращает в обработку то, что осело в карантине: конфигурация исправлена,
+    /// и теперь отправитель узнаётся. Курсор откатывается до самого раннего
+    /// карантинного сообщения, и оно перечитывается из Telegram вместе с медиа —
+    /// в карантине лежит только след, без файлов.
+    /// </summary>
+    public async Task<int> RequeueAsync(CancellationToken ct)
+    {
+        var subjects = await PrepareAsync(null, ct);
+
+        using var shared = Services.CreateScope();
+        var quarantine = shared.ServiceProvider.GetRequiredService<IQuarantineStore>();
+        var cursors = shared.ServiceProvider.GetRequiredService<ISyncCursorStore>();
+
+        var pending = await quarantine.GetAllAsync(ct);
+        if (pending.Count == 0)
+        {
+            Console.WriteLine("Карантин пуст.");
+            return 0;
+        }
+
+        foreach (var group in pending.GroupBy(q => q.PeerId))
+        {
+            var earliest = group.Min(q => q.TelegramMessageId);
+            var cursor = await cursors.GetAsync(group.Key, ct);
+
+            if (cursor is null || cursor.LastProcessedMessageId < earliest)
+            {
+                continue;
+            }
+
+            await cursors.SaveAsync(
+                cursor with { LastProcessedMessageId = earliest - 1 },
+                ct);
+
+            Console.WriteLine(
+                $"  чат {group.Key}: курсор отодвинут до {earliest - 1}, будет перечитано {group.Count()} сообщ.");
+        }
+
+        var cleared = await quarantine.ClearAsync(ct);
+        Console.WriteLine($"  карантин очищен ({cleared}).");
+
+        // Повторно уже сохранённые сообщения не задвоятся: приём идемпотентен
+        // по паре (чат, id сообщения).
+        return await SyncAsync(null, ct);
     }
 
     /// <summary>Исполняет команды, присланные в чат, и отвечает туда же.</summary>
@@ -446,7 +493,7 @@ public sealed class Runner(IHost host)
                     $"      SenderId {sender,-14} · {group.Count()} сообщ. · первое {first:dd.MM.yyyy}");
             }
 
-            Console.WriteLine("      добавь SenderId в Subjects[].Sources[].SenderIds и запусти sync заново");
+            Console.WriteLine("      добавь SenderId в Subjects[].Sources[].SenderIds и запусти: diary requeue");
         }
 
         Console.WriteLine();
@@ -494,3 +541,4 @@ file static class Html
     public static readonly System.Globalization.CultureInfo Culture =
         System.Globalization.CultureInfo.InvariantCulture;
 }
+

@@ -1,4 +1,4 @@
-Ты извлекаешь данные о симптоме желудочно-кишечного тракта из фрагмента расшифровки
+﻿Ты извлекаешь данные о симптоме желудочно-кишечного тракта из фрагмента расшифровки
 голосового сообщения на русском языке.
 
 Верни JSON строго по схеме. Ничего не додумывай.
@@ -28,7 +28,17 @@
 - `dayOffset` — 0 сегодня, -1 вчера.
 - `partOfDay` — `Morning`, `Noon`, `Afternoon`, `Evening`, `Night` или null.
 - `localTime` — формат `HH:mm` или null.
-- `hoursAgo` — «часа два назад» → 2. Иначе null.
+- `hoursAgo` — сколько времени прошло **от момента речи до симптома**: «часа два назад
+  прихватило» → 2. Иначе null.
+
+**delayAfterMealMinutes** — если сказано, через сколько после еды стало плохо
+(«через два часа», «часа через три после обеда»), верни это в минутах: 120, 180.
+Иначе null.
+
+**Осторожно: «через N часов» — это не `hoursAgo`.** «Съел X, через два часа стало плохо»
+означает, что симптом наступил через два часа **после еды**, а не два часа назад от момента
+речи. Такое указание идёт в `delayAfterMealMinutes`, а `time` остаётся null.
+Перепутать здесь дорого: симптом окажется раньше еды, и связь между ними просто не найдётся.
 
 ## Правила
 
@@ -40,12 +50,19 @@
 
 Вход: «Изжога, на четвёрку где-то. Это после ужина явно»
 Выход:
-{"kind":"Heartburn","severity":4,"durationMinutes":null,"suspectedFood":null,"notes":"связывает с ужином","time":null}
+{"kind":"Heartburn","severity":4,"durationMinutes":null,"suspectedFood":null,"notes":"связывает с ужином","time":null,"delayAfterMealMinutes":null}
 
 Вход: «Изжога с утра, тройка. Наверное после вчерашнего пива»
 Выход:
-{"kind":"Heartburn","severity":3,"durationMinutes":null,"suspectedFood":"пиво","notes":null,"time":{"dayOffset":0,"partOfDay":"Morning","localTime":null,"hoursAgo":null}}
+{"kind":"Heartburn","severity":3,"durationMinutes":null,"suspectedFood":"пиво","notes":null,"time":{"dayOffset":0,"partOfDay":"Morning","localTime":null,"hoursAgo":null},"delayAfterMealMinutes":null}
 
 Вход: «Вздутие сильное, пятёрка. И урчит»
 Выход:
-{"kind":"Bloating","severity":5,"durationMinutes":null,"suspectedFood":null,"notes":"урчание","time":null}
+{"kind":"Bloating","severity":5,"durationMinutes":null,"suspectedFood":null,"notes":"урчание","time":null,"delayAfterMealMinutes":null}
+
+Вход: «Съел большую фокаччу, а также немножко яичницы. Через два часа пронесло»
+(здесь тебе достаётся только часть про симптом)
+Выход:
+{"kind":"Diarrhea","severity":4,"durationMinutes":null,"suspectedFood":null,"notes":null,"time":null,"delayAfterMealMinutes":120}
+Пояснение: «через два часа» — задержка после еды, она идёт в delayAfterMealMinutes, а не в time.
+

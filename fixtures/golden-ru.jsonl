@@ -24,3 +24,4 @@
 {"text":"Живот крутит после обеда, где-то на шестёрку","categories":["symptom"],"symptomKind":"abdominalpain","severity":6}
 {"text":"Сегодня ел пиццу и потом весь вечер отрыжка, двойка","categories":["meal","symptom"],"foods":["пицца"],"symptomKind":"belching","severity":2}
 {"text":"Зачем нужен FrozenDictionary и когда он быстрее обычного","categories":["question"]}
+{"text":"Съел большую фокаччу, а также немножко яичницы. Через два часа пронесло","categories":["meal","symptom"],"foods":["фокачча","яичница"],"symptomKind":"diarrhea","severity":4,"comment":"«через два часа» — задержка после еды, а не сдвиг назад: симптом не должен оказаться раньше еды"}

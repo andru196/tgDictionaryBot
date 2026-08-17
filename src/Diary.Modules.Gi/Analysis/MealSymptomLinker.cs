@@ -1,4 +1,4 @@
-namespace Diary.Modules.Gi.Analysis;
+﻿namespace Diary.Modules.Gi.Analysis;
 
 /// <summary>
 /// Связывает симптомы с приёмами пищи. Reply — самый точный сигнал, но рассчитывать на него
@@ -77,12 +77,71 @@ public sealed class MealSymptomLinker
                 }
             }
 
+            // 3. Еда и симптом названы одним сообщением, и задержка между ними озвучена —
+            // «съел X, через два часа стало плохо». Самый частый способ записи и самый
+            // точный после reply: и что съел, и через сколько, сказано прямо.
+            if (!confirmed && symptom is { DelayAfterMeal: { } sameMessageDelay, SourceTelegramMessageId: { } source })
+            {
+                foreach (var meal in ordered)
+                {
+                    if (meal.SourceTelegramMessageId == source)
+                    {
+                        links.Add(new MealSymptomLink(
+                            meal.Id, symptom.Id, LinkKind.StatedDelay, 0.95, sameMessageDelay));
+                        confirmed = true;
+                    }
+                }
+            }
+
+            // 4. Задержка названа, но еда — из другого сообщения. Сам интервал всё ещё
+            // факт; остаётся понять, к какому приёму он относится.
+            if (!confirmed && symptom.DelayAfterMeal is { } delay)
+            {
+                MealObservation? closest = null;
+                var smallestMiss = TimeSpan.MaxValue;
+
+                foreach (var meal in ordered)
+                {
+                    if (meal.At > symptom.At)
+                    {
+                        break;
+                    }
+
+                    // Названная задержка отсчитывается от еды, но человек говорит уже после,
+                    // поэтому цель — приём примерно на таком расстоянии от момента симптома.
+                    var miss = (symptom.At - meal.At - delay).Duration();
+                    if (miss < smallestMiss)
+                    {
+                        smallestMiss = miss;
+                        closest = meal;
+                    }
+                }
+
+                // «Два часа» редко значит ровно 120 минут, но и не четыре часа.
+                var tolerance = TimeSpan.FromMinutes(Math.Max(45, delay.TotalMinutes * 0.5));
+
+                if (closest is not null && smallestMiss <= tolerance)
+                {
+                    links.Add(new MealSymptomLink(
+                        closest.Id, symptom.Id, LinkKind.StatedDelay, 0.85, symptom.At - closest.At));
+                    confirmed = true;
+                }
+                else if (closest is not null)
+                {
+                    // Подходящего приёма нет — вероятно, о еде просто не записали.
+                    // Задержку всё равно сохраняем как факт: она пригодится калибровке.
+                    links.Add(new MealSymptomLink(
+                        closest.Id, symptom.Id, LinkKind.StatedDelay, 0.6, delay));
+                    confirmed = true;
+                }
+            }
+
             if (confirmed)
             {
                 continue;
             }
 
-            // 3. Окно экспозиции.
+            // 5. Окно экспозиции.
             foreach (var meal in ordered)
             {
                 if (meal.At > symptom.At)
@@ -132,3 +191,4 @@ public sealed class MealSymptomLinker
         return lower.Length > 5 ? lower[..^1] : lower;
     }
 }
+
