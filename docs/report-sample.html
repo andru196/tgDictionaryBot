@@ -1,0 +1,489 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Дневник · 10–16 августа 2026</title>
+<!--
+  ШАБЛОН ОТЧЁТА. Данные ниже — выдуманные, для превью вёрстки.
+  Соответствие Razor-компонентам (Diary.Infrastructure.Reporting):
+
+    Report.razor                     — этот документ целиком, <style> инлайном
+    Sections/Header.razor            — .masthead + .stats
+    Sections/GiDashboard.razor       — секция «Пищеварение»
+      Parts/Heatmap.razor            — .heatmap
+      Parts/DayTimeline.razor        — svg.timeline
+      Parts/SuspectTable.razor       — table.suspects (продукты и теги)
+      Parts/CleanList.razor          — .chips.clean
+      Parts/SymptomTotals.razor      — .totals
+    Sections/Ideas.razor             — .cards
+    Sections/Questions.razor         — .qlist
+    Sections/RawLog.razor            — details.rawlog
+
+  Правила: ноль внешних запросов (CSS/SVG инлайн), ноль вычислений в разметке —
+  всё приходит готовым из ReportViewModel.
+-->
+<style>
+:root{
+  --bg:#faf9f7; --surface:#fff; --surface-2:#f4f2ee; --text:#1a1815; --muted:#6f695d;
+  --border:#e6e2d9; --border-soft:#efece5;
+  --gi:#c2410c; --gi-soft:#fde5d3; --idea:#4338ca; --idea-soft:#e4e3fb;
+  --question:#7c3aed; --question-soft:#ece2fd; --clean:#15803d; --clean-soft:#dcf3e2;
+  --shadow:0 1px 2px rgba(26,24,21,.04), 0 8px 24px -12px rgba(26,24,21,.14);
+  --h0:#f7f4ee; --h1:#f6ddc4; --h2:#f0b183; --h3:#df7a44; --h4:#b93f16;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#131211; --surface:#1c1a18; --surface-2:#242119; --text:#ece8e1; --muted:#9b9387;
+    --border:#332f29; --border-soft:#27241f;
+    --gi:#fb923c; --gi-soft:#3a2213; --idea:#8f97f5; --idea-soft:#1e1f3d;
+    --question:#b294f8; --question-soft:#291d3e; --clean:#5ed37f; --clean-soft:#14301c;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px -14px rgba(0,0,0,.7);
+    --h0:#211e1a; --h1:#43291a; --h2:#6b3c1d; --h3:#9a5220; --h4:#d4762c;
+  }
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--bg); color:var(--text);
+  font-family:ui-sans-serif,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  font-size:15px; line-height:1.6; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1060px; margin:0 auto; padding:56px 28px 96px}
+h1,h2,h3{font-family:ui-serif,Georgia,"Times New Roman",serif; font-weight:600; letter-spacing:-.01em; margin:0}
+
+/* ── шапка ───────────────────────────────────────────────── */
+.masthead{border-bottom:1px solid var(--border); padding-bottom:28px; margin-bottom:36px}
+.eyebrow{font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); margin-bottom:10px}
+.masthead h1{font-size:42px; line-height:1.12}
+.masthead .period{color:var(--muted); font-size:16px; margin-top:8px}
+.stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(128px,1fr)); gap:1px;
+  background:var(--border-soft); border:1px solid var(--border-soft); border-radius:12px; overflow:hidden; margin-top:28px}
+.stat{background:var(--surface); padding:16px 18px}
+.stat b{display:block; font-size:26px; font-weight:600; font-family:ui-serif,Georgia,serif; letter-spacing:-.02em}
+.stat span{font-size:12.5px; color:var(--muted)}
+
+/* ── секции ──────────────────────────────────────────────── */
+section{margin-top:56px}
+.sec-head{display:flex; align-items:baseline; gap:12px; margin-bottom:20px}
+.sec-head h2{font-size:26px}
+.sec-head .count{font-size:13px; color:var(--muted); background:var(--surface-2);
+  border:1px solid var(--border-soft); padding:2px 9px; border-radius:99px}
+.sec-head .rule{flex:1; height:1px; background:var(--border)}
+.lead{color:var(--muted); margin:-8px 0 22px; max-width:66ch}
+
+.card{background:var(--surface); border:1px solid var(--border); border-radius:14px;
+  padding:22px 24px; box-shadow:var(--shadow)}
+.card + .card{margin-top:18px}
+.card h3{font-size:16.5px; margin-bottom:14px}
+.card .hint{font-size:12.5px; color:var(--muted); margin-top:12px}
+
+/* ── тепловая карта ──────────────────────────────────────── */
+.heatmap{display:grid; grid-auto-flow:column; grid-template-rows:repeat(7,1fr); gap:4px}
+.heatmap i{width:100%; aspect-ratio:1; border-radius:3px; background:var(--h0); display:block}
+.heatmap i.l1{background:var(--h1)} .heatmap i.l2{background:var(--h2)}
+.heatmap i.l3{background:var(--h3)} .heatmap i.l4{background:var(--h4)}
+.hm-legend{display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); margin-top:12px}
+.hm-legend i{width:11px; height:11px; border-radius:3px; display:inline-block}
+
+/* ── таймлайн ────────────────────────────────────────────── */
+.timeline{width:100%; height:auto; display:block}
+.tl-axis{fill:var(--muted); font-size:10.5px; font-family:inherit}
+.tl-day{fill:var(--text); font-size:11.5px; font-family:inherit}
+.tl-grid{stroke:var(--border-soft); stroke-width:1}
+.tl-track{stroke:var(--border); stroke-width:1}
+.tl-meal{fill:var(--surface); stroke:var(--muted); stroke-width:1.4}
+.tl-meal.flag{fill:var(--gi-soft); stroke:var(--gi); stroke-width:1.6}
+.tl-sym{fill:var(--gi); opacity:.85}
+.tl-link{stroke:var(--gi); stroke-width:1.2; stroke-dasharray:2 3; opacity:.55}
+.legend{display:flex; flex-wrap:wrap; gap:18px; font-size:12.5px; color:var(--muted); margin-top:14px}
+.legend span{display:flex; align-items:center; gap:7px}
+.dot{width:10px; height:10px; border-radius:50%; border:1.4px solid var(--muted); background:var(--surface)}
+.dot.flag{border-color:var(--gi); background:var(--gi-soft)}
+.bar{width:5px; height:13px; border-radius:1px; background:var(--gi); opacity:.85}
+
+/* ── таблицы ─────────────────────────────────────────────── */
+table{width:100%; border-collapse:collapse; font-size:14px}
+th{text-align:left; font-weight:500; font-size:11.5px; letter-spacing:.07em; text-transform:uppercase;
+  color:var(--muted); padding:0 10px 10px 0; border-bottom:1px solid var(--border)}
+td{padding:11px 10px 11px 0; border-bottom:1px solid var(--border-soft); vertical-align:middle}
+tr:last-child td{border-bottom:0}
+td.num{font-variant-numeric:tabular-nums; white-space:nowrap}
+.food{font-weight:500}
+.liftbar{position:relative; min-width:118px}
+.liftbar em{position:absolute; inset:0; background:var(--gi); opacity:.16; border-radius:3px}
+.liftbar b{position:relative; font-variant-numeric:tabular-nums; font-weight:600; padding-left:7px; color:var(--gi)}
+.tag{display:inline-block; font-size:11.5px; padding:1px 8px; border-radius:99px;
+  background:var(--surface-2); border:1px solid var(--border-soft); color:var(--muted)}
+.tag.weak{color:var(--muted)}
+.tag.solid{background:var(--gi-soft); border-color:transparent; color:var(--gi)}
+.tag.ok{background:var(--clean-soft); border-color:transparent; color:var(--clean)}
+
+.chips{display:flex; flex-wrap:wrap; gap:8px}
+.chips span{border:1px solid var(--border); border-radius:99px; padding:5px 13px; font-size:13.5px; background:var(--surface)}
+.chips.clean span{background:var(--clean-soft); border-color:transparent; color:var(--clean)}
+.chips.clean span b{font-weight:600; font-variant-numeric:tabular-nums; opacity:.75}
+
+.totals{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:14px}
+.total{border:1px solid var(--border); border-radius:12px; padding:14px 16px; background:var(--surface)}
+.total b{display:block; font-size:22px; font-family:ui-serif,Georgia,serif; letter-spacing:-.02em}
+.total span{font-size:12.5px; color:var(--muted)}
+.total .sev{display:block; font-size:12px; color:var(--gi); margin-top:5px}
+
+/* ── идеи ────────────────────────────────────────────────── */
+.cards{display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px}
+.idea{background:var(--surface); border:1px solid var(--border); border-left:3px solid var(--idea);
+  border-radius:12px; padding:18px 20px; box-shadow:var(--shadow)}
+.idea h3{font-size:16px; margin-bottom:8px; line-height:1.35}
+.idea p{margin:0; color:var(--muted); font-size:14px}
+.idea footer{display:flex; align-items:center; gap:8px; margin-top:14px; font-size:12px; color:var(--muted)}
+.theme{display:inline-block; font-size:11.5px; padding:1px 9px; border-radius:99px;
+  background:var(--idea-soft); color:var(--idea)}
+.badge-do{font-size:11.5px; padding:1px 9px; border-radius:99px; background:var(--gi-soft); color:var(--gi)}
+.mic{opacity:.55}
+
+/* ── вопросы ─────────────────────────────────────────────── */
+.qgroup{margin-bottom:26px}
+.qgroup > h3{font-size:13px; letter-spacing:.09em; text-transform:uppercase; color:var(--question); margin-bottom:12px}
+.qlist{list-style:none; margin:0; padding:0}
+.qlist li{display:flex; gap:13px; padding:13px 0; border-bottom:1px solid var(--border-soft)}
+.qlist li:last-child{border-bottom:0}
+.qlist .box{flex:none; width:16px; height:16px; margin-top:3px; border:1.5px solid var(--border);
+  border-radius:4px; background:var(--surface)}
+.qlist .q{font-size:14.5px}
+.qlist .a{display:block; color:var(--muted); font-size:13.5px; margin-top:5px; padding-left:11px;
+  border-left:2px solid var(--question-soft)}
+.qlist time{flex:none; margin-left:auto; color:var(--muted); font-size:12px; font-variant-numeric:tabular-nums}
+
+/* ── сноски и лог ────────────────────────────────────────── */
+.note{border:1px solid var(--border); border-left:3px solid var(--muted); border-radius:10px;
+  padding:15px 18px; font-size:13.5px; color:var(--muted); background:var(--surface-2)}
+.note b{color:var(--text); font-weight:600}
+.rawlog{border:1px solid var(--border); border-radius:12px; background:var(--surface); overflow:hidden}
+.rawlog > summary{cursor:pointer; padding:15px 20px; font-size:14px; user-select:none}
+.rawlog > summary::marker{color:var(--muted)}
+.rawlog .log{border-top:1px solid var(--border-soft); padding:6px 20px 16px}
+.entry{display:grid; grid-template-columns:96px 1fr; gap:14px; padding:11px 0; border-bottom:1px solid var(--border-soft)}
+.entry:last-child{border-bottom:0}
+.entry time{color:var(--muted); font-size:12.5px; font-variant-numeric:tabular-nums; padding-top:2px}
+.entry .txt{font-size:14px}
+.entry .meta{font-size:11.5px; color:var(--muted); margin-top:5px; display:flex; gap:8px; flex-wrap:wrap}
+footer.colophon{margin-top:64px; padding-top:22px; border-top:1px solid var(--border);
+  font-size:12.5px; color:var(--muted); display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap}
+
+@media (max-width:640px){
+  .wrap{padding:32px 16px 64px}
+  .masthead h1{font-size:30px}
+  .entry{grid-template-columns:1fr; gap:4px}
+}
+@media print{
+  :root{--bg:#fff; --surface:#fff; --shadow:none}
+  .wrap{max-width:none; padding:0}
+  section{break-inside:avoid}
+  .card,.idea{break-inside:avoid}
+  .rawlog[open] > summary{display:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- ══ Sections/Header.razor ══════════════════════════════ -->
+<header class="masthead">
+  <div class="eyebrow">Личный дневник · отчёт</div>
+  <h1>Неделя 33</h1>
+  <div class="period">10 — 16 августа 2026 · сгенерировано 17 августа в 09:14</div>
+  <div class="stats">
+    <div class="stat"><b>47</b><span>сообщений</span></div>
+    <div class="stat"><b>18</b><span>голосовых</span></div>
+    <div class="stat"><b>24 мин</b><span>речи расшифровано</span></div>
+    <div class="stat"><b>63</b><span>записи извлечено</span></div>
+    <div class="stat"><b>5</b><span>симптомов</span></div>
+    <div class="stat"><b>2</b><span>чистых дня</span></div>
+  </div>
+</header>
+
+<!-- ══ Sections/GiDashboard.razor ═════════════════════════ -->
+<section>
+  <div class="sec-head"><h2>Пищеварение</h2><span class="count">21 приём пищи · 5 симптомов</span><div class="rule"></div></div>
+  <p class="lead">Таймлайн — за отчётную неделю. Корреляции ниже считаются по всей истории наблюдений (86 дней), иначе выборка слишком мала для выводов.</p>
+
+  <div class="card">
+    <h3>Тяжесть симптомов по дням · последние 8 недель</h3>
+    <div class="heatmap">
+      <i></i><i class="l1"></i><i></i><i class="l2"></i><i class="l3"></i><i></i><i class="l1"></i>
+      <i class="l2"></i><i></i><i></i><i class="l1"></i><i class="l3"></i><i class="l2"></i><i></i>
+      <i></i><i class="l1"></i><i class="l4"></i><i class="l2"></i><i></i><i></i><i class="l1"></i>
+      <i class="l1"></i><i class="l2"></i><i></i><i></i><i class="l3"></i><i class="l1"></i><i></i>
+      <i class="l3"></i><i></i><i class="l1"></i><i class="l2"></i><i class="l4"></i><i></i><i></i>
+      <i></i><i></i><i class="l2"></i><i class="l1"></i><i></i><i class="l2"></i><i class="l1"></i>
+      <i class="l2"></i><i class="l1"></i><i></i><i></i><i class="l1"></i><i class="l3"></i><i></i>
+      <i class="l2"></i><i class="l3"></i><i></i><i class="l2"></i><i class="l4"></i><i class="l1"></i><i></i>
+    </div>
+    <div class="hm-legend">
+      <span>меньше</span><i style="background:var(--h0)"></i><i style="background:var(--h1)"></i>
+      <i style="background:var(--h2)"></i><i style="background:var(--h3)"></i><i style="background:var(--h4)"></i><span>больше</span>
+      <span style="margin-left:auto">строка — день недели, столбец — неделя</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Еда и симптомы по часам</h3>
+    <svg class="timeline" viewBox="0 0 960 292" role="img" aria-label="Таймлайн приёмов пищи и симптомов за неделю">
+      <!-- сетка часов -->
+      <g class="tl-axis">
+        <text x="64" y="14">0</text><text x="174" y="14">3</text><text x="284" y="14">6</text>
+        <text x="394" y="14">9</text><text x="504" y="14">12</text><text x="614" y="14">15</text>
+        <text x="724" y="14">18</text><text x="834" y="14">21</text><text x="938" y="14" text-anchor="end">24</text>
+      </g>
+      <g class="tl-grid">
+        <line x1="64" y1="22" x2="64" y2="284"/><line x1="174" y1="22" x2="174" y2="284"/>
+        <line x1="284" y1="22" x2="284" y2="284"/><line x1="394" y1="22" x2="394" y2="284"/>
+        <line x1="504" y1="22" x2="504" y2="284"/><line x1="614" y1="22" x2="614" y2="284"/>
+        <line x1="724" y1="22" x2="724" y2="284"/><line x1="834" y1="22" x2="834" y2="284"/>
+        <line x1="940" y1="22" x2="940" y2="284"/>
+      </g>
+
+      <!-- Пн 10 -->
+      <text class="tl-day" x="0" y="52">пн 10</text>
+      <line class="tl-track" x1="64" y1="48" x2="940" y2="48"/>
+      <circle class="tl-meal" cx="394" cy="48" r="4.5"/><circle class="tl-meal" cx="577" cy="48" r="4.5"/>
+      <circle class="tl-meal flag" cx="778" cy="48" r="5"/>
+      <line class="tl-link" x1="778" y1="48" x2="834" y2="48"/>
+      <rect class="tl-sym" x="831" y="36" width="6" height="12" rx="1"/>
+
+      <!-- Вт 11 -->
+      <text class="tl-day" x="0" y="86">вт 11</text>
+      <line class="tl-track" x1="64" y1="82" x2="940" y2="82"/>
+      <circle class="tl-meal" cx="376" cy="82" r="4.5"/><circle class="tl-meal" cx="541" cy="82" r="4.5"/>
+      <circle class="tl-meal flag" cx="797" cy="82" r="5"/>
+      <line class="tl-link" x1="797" y1="82" x2="871" y2="82"/>
+      <rect class="tl-sym" x="868" y="64" width="6" height="18" rx="1"/>
+      <rect class="tl-sym" x="923" y="73" width="6" height="9" rx="1"/>
+
+      <!-- Ср 12 -->
+      <text class="tl-day" x="0" y="120">ср 12</text>
+      <line class="tl-track" x1="64" y1="116" x2="940" y2="116"/>
+      <circle class="tl-meal" cx="394" cy="116" r="4.5"/><circle class="tl-meal" cx="577" cy="116" r="4.5"/>
+      <circle class="tl-meal" cx="760" cy="116" r="4.5"/>
+
+      <!-- Чт 13 -->
+      <text class="tl-day" x="0" y="154">чт 13</text>
+      <line class="tl-track" x1="64" y1="150" x2="940" y2="150"/>
+      <circle class="tl-meal flag" cx="357" cy="150" r="5"/><circle class="tl-meal flag" cx="504" cy="150" r="5"/>
+      <circle class="tl-meal flag" cx="724" cy="150" r="5"/>
+      <line class="tl-link" x1="504" y1="150" x2="614" y2="150"/>
+      <rect class="tl-sym" x="611" y="135" width="6" height="15" rx="1"/>
+      <rect class="tl-sym" x="831" y="135" width="6" height="15" rx="1"/>
+
+      <!-- Пт 14 -->
+      <text class="tl-day" x="0" y="188">пт 14</text>
+      <line class="tl-track" x1="64" y1="184" x2="940" y2="184"/>
+      <circle class="tl-meal" cx="412" cy="184" r="4.5"/><circle class="tl-meal" cx="559" cy="184" r="4.5"/>
+      <circle class="tl-meal flag" cx="815" cy="184" r="5"/><circle class="tl-meal flag" cx="871" cy="184" r="5"/>
+      <line class="tl-link" x1="871" y1="184" x2="925" y2="184"/>
+      <rect class="tl-sym" x="922" y="163" width="6" height="21" rx="1"/>
+
+      <!-- Сб 15 -->
+      <text class="tl-day" x="0" y="222">сб 15</text>
+      <line class="tl-track" x1="64" y1="218" x2="940" y2="218"/>
+      <circle class="tl-meal" cx="467" cy="218" r="4.5"/><circle class="tl-meal flag" cx="650" cy="218" r="5"/>
+      <circle class="tl-meal" cx="797" cy="218" r="4.5"/>
+      <rect class="tl-sym" x="538" y="209" width="6" height="9" rx="1"/>
+
+      <!-- Вс 16 -->
+      <text class="tl-day" x="0" y="256">вс 16</text>
+      <line class="tl-track" x1="64" y1="252" x2="940" y2="252"/>
+      <circle class="tl-meal" cx="431" cy="252" r="4.5"/><circle class="tl-meal" cx="577" cy="252" r="4.5"/>
+      <circle class="tl-meal" cx="760" cy="252" r="4.5"/>
+    </svg>
+    <div class="legend">
+      <span><i class="dot"></i> приём пищи</span>
+      <span><i class="dot flag"></i> содержит продукт-подозреваемый</span>
+      <span><i class="bar"></i> симптом, высота = тяжесть 0–10</span>
+      <span>пунктир — связка, подтверждённая твоим reply</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Подозреваемые продукты <span class="tag">по всей истории · 86 дней</span></h3>
+    <table class="suspects">
+      <thead><tr>
+        <th>Продукт</th><th>Приёмов</th><th>С симптомом</th><th>P(симптом)</th>
+        <th>Отношение к базовой</th><th>Медиан. задержка</th><th>Оценка</th>
+      </tr></thead>
+      <tbody>
+        <tr><td class="food">Картофель жареный</td><td class="num">11</td><td class="num">8</td><td class="num">73 %</td>
+            <td class="liftbar"><em style="width:100%"></em><b>2.4×</b></td><td class="num">2 ч 10 м</td><td><span class="tag solid">сильный сигнал</span></td></tr>
+        <tr><td class="food">Пиво</td><td class="num">7</td><td class="num">5</td><td class="num">71 %</td>
+            <td class="liftbar"><em style="width:96%"></em><b>2.3×</b></td><td class="num">1 ч 40 м</td><td><span class="tag solid">сильный сигнал</span></td></tr>
+        <tr><td class="food">Кофе натощак</td><td class="num">19</td><td class="num">11</td><td class="num">58 %</td>
+            <td class="liftbar"><em style="width:79%"></em><b>1.9×</b></td><td class="num">55 м</td><td><span class="tag solid">сильный сигнал</span></td></tr>
+        <tr><td class="food">Пицца</td><td class="num">6</td><td class="num">4</td><td class="num">67 %</td>
+            <td class="liftbar"><em style="width:88%"></em><b>2.1×</b></td><td class="num">3 ч 05 м</td><td><span class="tag weak">слабый · p = 0.06</span></td></tr>
+        <tr><td class="food">Шаурма</td><td class="num">4</td><td class="num">3</td><td class="num">75 %</td>
+            <td class="liftbar"><em style="width:100%"></em><b>2.4×</b></td><td class="num">4 ч 20 м</td><td><span class="tag weak">мало данных · n = 4</span></td></tr>
+        <tr><td class="food">Творог</td><td class="num">14</td><td class="num">4</td><td class="num">29 %</td>
+            <td class="liftbar"><em style="width:39%"></em><b>0.9×</b></td><td class="num">—</td><td><span class="tag">связи нет</span></td></tr>
+      </tbody>
+    </table>
+    <p class="hint">Базовая частота симптома после произвольного приёма пищи — <b>31 %</b>. «Отношение к базовой» (lift) показывает, во сколько раз чаще симптом случается именно после этого продукта.</p>
+  </div>
+
+  <div class="card">
+    <h3>Свойства пищи — сигнал накапливается быстрее, чем по блюдам</h3>
+    <table>
+      <thead><tr><th>Свойство</th><th>Приёмов</th><th>P(симптом)</th><th>Отношение</th><th>p-value</th></tr></thead>
+      <tbody>
+        <tr><td class="food">Жареное</td><td class="num">34</td><td class="num">61 %</td>
+            <td class="liftbar"><em style="width:100%"></em><b>2.0×</b></td><td class="num">0.0008</td></tr>
+        <tr><td class="food">Алкоголь</td><td class="num">12</td><td class="num">67 %</td>
+            <td class="liftbar"><em style="width:100%"></em><b>2.2×</b></td><td class="num">0.011</td></tr>
+        <tr><td class="food">Жирное</td><td class="num">41</td><td class="num">54 %</td>
+            <td class="liftbar"><em style="width:82%"></em><b>1.7×</b></td><td class="num">0.004</td></tr>
+        <tr><td class="food">Кофеин</td><td class="num">22</td><td class="num">47 %</td>
+            <td class="liftbar"><em style="width:70%"></em><b>1.5×</b></td><td class="num">0.081</td></tr>
+        <tr><td class="food">Молочное</td><td class="num">28</td><td class="num">29 %</td>
+            <td class="liftbar"><em style="width:38%"></em><b>0.9×</b></td><td class="num">0.62</td></tr>
+      </tbody>
+    </table>
+    <p class="hint">«Борщ» за месяц встретится три раза — статистики не будет. «Жареное» — сорок раз, и сигнал виден уже на второй неделе. Поэтому корреляции считаются на двух уровнях сразу.</p>
+  </div>
+
+  <div class="card">
+    <h3>Переносится хорошо</h3>
+    <div class="chips clean">
+      <span>Гречка <b>14</b></span><span>Куриная грудка <b>17</b></span><span>Рис <b>13</b></span>
+      <span>Овсянка на воде <b>21</b></span><span>Печёные овощи <b>9</b></span><span>Банан <b>12</b></span>
+    </div>
+    <p class="hint">Продукты, съеденные не меньше пяти раз, после которых симптом случался реже базовой частоты. Список «что можно» на практике полезнее списка «чего избегать».</p>
+  </div>
+
+  <div class="card">
+    <h3>Симптомы за 86 дней</h3>
+    <div class="totals">
+      <div class="total"><b>23</b><span>изжога</span><span class="sev">средняя тяжесть 4.1</span></div>
+      <div class="total"><b>14</b><span>рефлюкс</span><span class="sev">средняя тяжесть 5.6</span></div>
+      <div class="total"><b>11</b><span>вздутие</span><span class="sev">средняя тяжесть 3.8</span></div>
+      <div class="total"><b>8</b><span>отрыжка</span><span class="sev">средняя тяжесть 2.5</span></div>
+    </div>
+  </div>
+
+  <p class="note" style="margin-top:18px">
+    <b>Как это читать.</b> Это дневник наблюдений, а не диагностика. Совпадение во времени не означает причину:
+    чем больше продуктов проверяется, тем выше шанс случайной «находки» — при шести продуктах и пороге p&nbsp;=&nbsp;0.05
+    примерно одно срабатывание из двадцати будет ложным. Строки с пометкой «мало данных» показаны не как вывод,
+    а чтобы было видно, чего именно не хватает для вывода. Если сигнал устойчив — это повод обсудить его с врачом,
+    а не повод самому исключать продукты.
+  </p>
+</section>
+
+<!-- ══ Sections/Ideas.razor ═══════════════════════════════ -->
+<section>
+  <div class="sec-head"><h2>Идеи</h2><span class="count">5 за неделю</span><div class="rule"></div></div>
+  <div class="cards">
+    <article class="idea">
+      <h3>Линтер для промптов</h3>
+      <p>Промпт — это код: у него есть версия, контракт и регрессии. Хочется анализатор, который ругается на противоречия в инструкциях и на схему, которую модель физически не может заполнить.</p>
+      <footer><span class="theme">разработка</span><span class="badge-do">сделать</span><span class="mic">🎙 1:12</span><time>вт, 21:40</time></footer>
+    </article>
+    <article class="idea">
+      <h3>Source generator для маппинга DTO</h3>
+      <p>Вместо рефлексии — кодогенерация на этапе компиляции. Заодно ловит рассинхрон между доменной моделью и контрактом до запуска.</p>
+      <footer><span class="theme">разработка</span><span class="mic">🎙 0:38</span><time>ср, 11:05</time></footer>
+    </article>
+    <article class="idea">
+      <h3>Голосовой таймер помидоров</h3>
+      <p>Не нажимать кнопку, а сказать «начали» — и получить голосовое уведомление в конце. Руки заняты клавиатурой, а не телефоном.</p>
+      <footer><span class="theme">продуктивность</span><span class="mic">🎙 0:24</span><time>чт, 16:22</time></footer>
+    </article>
+    <article class="idea">
+      <h3>Статья про <code>Result&lt;T&gt;</code> вместо исключений</h3>
+      <p>С разбором, где подход реально помогает, а где превращает код в лапшу из проверок. Примеры — из этого же проекта.</p>
+      <footer><span class="theme">тексты</span><span class="badge-do">сделать</span><time>пт, 09:50</time></footer>
+    </article>
+    <article class="idea">
+      <h3>Автосинк дневника в Obsidian</h3>
+      <p>Отчёт хорош раз в неделю, но заметки хочется искать сразу. Экспорт записей в markdown-хранилище с обратными ссылками на исходные сообщения.</p>
+      <footer><span class="theme">инструменты</span><span class="mic">🎙 0:51</span><time>сб, 13:31</time></footer>
+    </article>
+  </div>
+</section>
+
+<!-- ══ Sections/Questions.razor ═══════════════════════════ -->
+<section>
+  <div class="sec-head"><h2>Вопросы</h2><span class="count">6 накопилось</span><div class="rule"></div></div>
+  <p class="lead">Ответы сгенерированы локальной моделью и намеренно короткие — как подсказка, с чего начать, а не как источник истины.</p>
+
+  <div class="qgroup">
+    <h3>.NET</h3>
+    <ul class="qlist">
+      <li><i class="box"></i><div><span class="q">Чем <code>Span&lt;T&gt;</code> отличается от <code>Memory&lt;T&gt;</code> и когда что брать?</span>
+        <span class="a"><code>Span&lt;T&gt;</code> — ref struct, живёт только на стеке: нельзя в поля класса, нельзя через <code>await</code>. <code>Memory&lt;T&gt;</code> этих ограничений не имеет и потому годится для асинхронных API, платя за это косвенностью.</span></div><time>пн</time></li>
+      <li><i class="box"></i><div><span class="q">Почему split query в EF Core иногда быстрее одиночного?</span>
+        <span class="a">Один JOIN на несколько коллекций даёт декартово произведение строк — трафик и материализация растут перемножением. Split разбивает на несколько запросов, экономя объём ценой лишних round-trip.</span></div><time>ср</time></li>
+      <li><i class="box"></i><div><span class="q">Зачем нужен <code>FrozenDictionary</code>?</span>
+        <span class="a">Дороже строится, но быстрее читает. Для словарей, которые собираются один раз на старте и потом только читаются, — заметный выигрыш на lookup.</span></div><time>пт</time></li>
+    </ul>
+  </div>
+
+  <div class="qgroup">
+    <h3>Данные и статистика</h3>
+    <ul class="qlist">
+      <li><i class="box"></i><div><span class="q">Как работает WAL в SQLite и почему он тут включён?</span>
+        <span class="a">Запись идёт в отдельный журнал, читатели не блокируют писателя. Для схемы «демон пишет, CLI читает» это ровно то, что нужно.</span></div><time>вт</time></li>
+      <li><i class="box"></i><div><span class="q">Что такое lift и чем он отличается от корреляции?</span>
+        <span class="a">Отношение условной вероятности к безусловной: во сколько раз событие вероятнее при условии. В отличие от коэффициента корреляции работает с бинарными признаками и читается напрямую.</span></div><time>чт</time></li>
+    </ul>
+  </div>
+
+  <div class="qgroup">
+    <h3>Telegram</h3>
+    <ul class="qlist">
+      <li><i class="box"></i><div><span class="q">Как долго живёт <code>file_id</code> и можно ли качать аудио потом?</span>
+        <span class="a">Сам <code>file_id</code> стабилен для бота, но ссылка от <code>getFile</code> временная. Поэтому файлы забираются сразу при приёме — отложенное скачивание ненадёжно.</span></div><time>сб</time></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ══ Sections/RawLog.razor ══════════════════════════════ -->
+<section>
+  <div class="sec-head"><h2>Приложение</h2><div class="rule"></div></div>
+  <details class="rawlog">
+    <summary>Сырой лог за неделю — 47 сообщений, транскрипты, исходные файлы</summary>
+    <div class="log">
+      <div class="entry"><time>пн, 19:34</time><div>
+        <div class="txt">«Поужинал жарёхой с котлетой, ну и хлеба пару кусков»</div>
+        <div class="meta"><span class="tag">🎙 0:09</span><span class="tag">→ еда</span><span class="tag">картофель жареный · свинина · хлеб пшеничный</span><span>msg 1734</span></div>
+      </div></div>
+      <div class="entry"><time>пн, 21:02</time><div>
+        <div class="txt">«Изжога, на четвёрку где-то. Это после ужина явно»</div>
+        <div class="meta"><span class="tag">🎙 0:06</span><span class="tag">→ симптом</span><span class="tag solid">reply → msg 1734</span><span class="tag">изжога · 4/10</span></div>
+      </div></div>
+      <div class="entry"><time>вт, 21:40</time><div>
+        <div class="txt">«Слушай, а прикольная мысль — сделать линтер для промптов. Ну то есть промпт это же код по сути, у него версия есть, контракт… И чтобы он ругался, когда в инструкции противоречие. Кстати ужинал пиццей сегодня»</div>
+        <div class="meta"><span class="tag">🎙 1:12</span><span class="tag">→ идея</span><span class="tag">→ еда</span><span>2 записи из одного сообщения</span></div>
+      </div></div>
+      <div class="entry"><time>чт, 12:15</time><div>
+        <div class="txt">«Взял шаурму на обед, знаю что зря»</div>
+        <div class="meta"><span class="tag">текст</span><span class="tag">→ еда</span><span class="tag">шаурма · курица · соус чесночный</span></div>
+      </div></div>
+      <div class="entry"><time>чт, 15:04</time><div>
+        <div class="txt">«Вздутие сильное, пятёрка. И урчит»</div>
+        <div class="meta"><span class="tag">🎙 0:05</span><span class="tag">→ симптом</span><span class="tag">вздутие · 5/10</span><span>окно 1–8 ч → шаурма</span></div>
+      </div></div>
+      <div class="entry"><time>пт, 22:00</time><div>
+        <div class="txt">«Пиво выпил, бутылку. Вчера вечером ещё картошку жарил, забыл записать»</div>
+        <div class="meta"><span class="tag">🎙 0:14</span><span class="tag">→ еда ×2</span><span class="tag weak">относительное время: «вчера вечером» → чт 20:00</span></div>
+      </div></div>
+    </div>
+  </details>
+</section>
+
+<footer class="colophon">
+  <span>Собрано локально · Qwen3-8B @ LM Studio · Whisper large-v3-turbo · промпты v3</span>
+  <span>Ни один байт не покидал эту машину</span>
+</footer>
+
+</div>
+</body>
+</html>

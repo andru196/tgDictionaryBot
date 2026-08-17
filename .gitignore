@@ -1,0 +1,64 @@
+# --- Локальные инструкции для агентов (не публикуем) ---
+CLAUDE.md
+.claude/
+
+# --- Личные данные дневника: НИКОГДА не коммитим ---
+data/
+reports/
+models/
+*.db
+*.db-shm
+*.db-wal
+*.ogg
+*.oga
+*.wav
+appsettings.Local.json
+appsettings.*.Local.json
+secrets.json
+.env
+
+# --- .NET ---
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+artifacts/
+publish/
+*.user
+*.userosscache
+*.suo
+*.userprefs
+*.sln.docstates
+*.binlog
+*.nupkg
+*.snupkg
+project.lock.json
+project.fragment.lock.json
+.packages/
+BenchmarkDotNet.Artifacts/
+TestResults/
+coverage*.json
+coverage*.xml
+coverage*.info
+*.received.*
+*.received/
+
+# --- IDE ---
+.vs/
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.swp
+*~
+
+# --- OS ---
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
