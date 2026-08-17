@@ -146,7 +146,12 @@ eval.SetAction((parse, ct) => new Runner(HostFactory.Build(
         parse.GetValue(subjectOption), parse.GetValue(setOption)!, parse.GetValue(jsonOption), ct));
 
 var status = new Command("status", "Что накоплено, в каком состоянии и что в карантине.");
-status.SetAction((parse, ct) => CreateRunner(parse).StatusAsync(ct));
+var detailsOption = new Option<bool>("--details")
+{
+    Description = "Показать, что именно не разобралось и почему.",
+};
+status.Options.Add(detailsOption);
+status.SetAction((parse, ct) => CreateRunner(parse).StatusAsync(parse.GetValue(detailsOption), ct));
 
 var retention = new Command("retention", "Реакции или удаление разобранных сообщений в Telegram.");
 var modeOption = new Option<string?>("--mode") { Description = "Keep | React | Delete." };

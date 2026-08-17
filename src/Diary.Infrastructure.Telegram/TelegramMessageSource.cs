@@ -53,6 +53,20 @@ public sealed class TelegramMessageSource : IMessageSource
         _logger = logger;
 
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(_options.SessionFile))!);
+
+        // Библиотека по умолчанию пишет весь обмен MTProto прямо в консоль. Это заливает
+        // вывод и, что хуже, топит приглашение ввести код при первом входе. Уводим
+        // в обычный логгер на Debug — при --verbose всё по-прежнему видно.
+        WTelegram.Helpers.Log = (level, message) => logger.Log(
+            level switch
+            {
+                4 => LogLevel.Error,
+                3 => LogLevel.Warning,
+                2 => LogLevel.Debug,
+                _ => LogLevel.Trace,
+            },
+            "{Message}", message);
+
         _client = new WTelegram.Client(ConfigValue);
     }
 

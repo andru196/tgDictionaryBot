@@ -19,6 +19,12 @@ public interface IMessageRepository
 
     Task<IReadOnlyDictionary<ProcessingState, int>> CountByStateAsync(CancellationToken ct);
 
+    /// <summary>
+    /// Сообщения, которые не дошли до конца, с причинами. Без этого «пропущено 1»
+    /// в сводке — тупик: непонятно, что случилось и надо ли что-то делать.
+    /// </summary>
+    Task<IReadOnlyList<CapturedMessage>> GetProblematicAsync(int limit, CancellationToken ct);
+
     Task AddAsync(CapturedMessage message, CancellationToken ct);
 
     Task<CapturedMessage?> FindAsync(MessageId id, CancellationToken ct);

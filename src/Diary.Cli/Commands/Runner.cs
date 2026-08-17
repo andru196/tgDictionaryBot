@@ -276,7 +276,7 @@ public sealed class Runner(IHost host)
         static string Shorten(string text) => text.Length <= 70 ? text : text[..70] + "…";
     }
 
-    public async Task<int> StatusAsync(CancellationToken ct)
+    public async Task<int> StatusAsync(bool details, CancellationToken ct)
     {
         var subjects = await PrepareAsync(null, ct);
         var factory = Services.GetRequiredService<ISubjectScopeFactory>();
@@ -285,7 +285,8 @@ public sealed class Runner(IHost host)
         foreach (var subject in subjects)
         {
             using var scope = factory.Create(subject);
-            var counts = await scope.Resolve<IMessageRepository>().CountByStateAsync(ct);
+            var messages = scope.Resolve<IMessageRepository>();
+            var counts = await messages.CountByStateAsync(ct);
             var entries = await scope.Resolve<IEntryRepository>().CountAsync(ct);
 
             var parts = counts.Count == 0
@@ -293,6 +294,29 @@ public sealed class Runner(IHost host)
                 : string.Join(", ", counts.OrderBy(c => c.Key).Select(c => $"{Describe(c.Key)} {c.Value}"));
 
             Console.WriteLine($"  {subject.Key,-10} {parts}; записей {entries}");
+
+            var problems = counts.GetValueOrDefault(ProcessingState.Failed)
+                         + counts.GetValueOrDefault(ProcessingState.Skipped);
+
+            if (problems == 0)
+            {
+                continue;
+            }
+
+            if (!details)
+            {
+                Console.WriteLine($"             причины: diary status --details");
+                continue;
+            }
+
+            foreach (var message in await messages.GetProblematicAsync(10, ct))
+            {
+                var local = TimeZoneInfo.ConvertTime(message.SentAtUtc, subject.TimeZone);
+                Console.WriteLine(
+                    $"             #{message.TelegramMessageId} {local:dd.MM.yyyy HH:mm} " +
+                    $"— {message.FailureReason ?? "без причины"}");
+                Console.WriteLine($"               {Preview(message.EffectiveText)}");
+            }
         }
 
         using var shared = Services.CreateScope();
@@ -327,6 +351,17 @@ public sealed class Runner(IHost host)
             ProcessingState.Superseded => "устарело",
             _ => state.ToString(),
         };
+
+        static string Preview(string? text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return "(пусто)";
+            }
+
+            var single = text.ReplaceLineEndings(" ").Trim();
+            return single.Length <= 90 ? single : single[..90] + "…";
+        }
     }
 
     private static void OpenInBrowser(string path)

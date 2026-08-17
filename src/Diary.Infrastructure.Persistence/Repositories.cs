@@ -37,6 +37,13 @@ public sealed class MessageRepository(DiaryDbContext db) : IMessageRepository
             .Select(g => new { g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.Key, x => x.Count, ct);
 
+    public async Task<IReadOnlyList<CapturedMessage>> GetProblematicAsync(int limit, CancellationToken ct) =>
+        await db.Messages
+            .Where(m => m.State == ProcessingState.Failed || m.State == ProcessingState.Skipped)
+            .OrderByDescending(m => m.SentAtUtc)
+            .Take(limit)
+            .ToListAsync(ct);
+
     public async Task AddAsync(CapturedMessage message, CancellationToken ct) =>
         await db.Messages.AddAsync(message, ct);
 
