@@ -2,6 +2,7 @@ using Diary.Application;
 using Diary.Application.Modules;
 using Diary.Application.Ports;
 using Diary.Application.Reporting;
+using Diary.Application.Speech;
 using Diary.Application.Subjects;
 using Diary.Application.UseCases;
 using Diary.Cli.Configuration;
@@ -16,6 +17,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Diary.Cli;
 
@@ -25,7 +27,7 @@ namespace Diary.Cli;
 /// </summary>
 public static class HostFactory
 {
-    public static IHost Build(string? sourceSpec, bool verbose)
+    public static IHost Build(string? sourceSpec, bool verbose, string? modelOverride = null)
     {
         var builder = Host.CreateApplicationBuilder();
 
@@ -34,6 +36,17 @@ public static class HostFactory
             .AddJsonFile("appsettings.json", optional: false)
             .AddJsonFile("appsettings.Local.json", optional: true)
             .AddEnvironmentVariables("DIARY_");
+
+        // Сравнение моделей не должно требовать правки конфига между прогонами.
+        if (!string.IsNullOrWhiteSpace(modelOverride))
+        {
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [$"{LlmOptions.SectionName}:Roles:Segmentation:Model"] = modelOverride,
+                [$"{LlmOptions.SectionName}:Roles:Extraction:Model"] = modelOverride,
+                [$"{LlmOptions.SectionName}:Roles:Answering:Model"] = modelOverride,
+            });
+        }
 
         builder.Logging.ClearProviders();
         builder.Logging.AddSimpleConsole(options =>
@@ -62,12 +75,14 @@ public static class HostFactory
         services.Configure<SpeechOptions>(builder.Configuration.GetSection(SpeechOptions.SectionName));
         services.Configure<TelegramOptions>(builder.Configuration.GetSection(TelegramOptions.SectionName));
 
+        services.AddSingleton<LmStudioChatClient>();
         services.AddSingleton<IStructuredCompletion, LmStudioCompletion>();
+        services.AddSingleton<IToolCallingCompletion, LmStudioToolCalling>();
         services.AddSingleton<IEntrySegmenter, LlmEntrySegmenter>();
 
         services.AddSingleton<IAudioDecoder, OggOpusDecoder>();
-        services.AddSingleton<IUtteranceReader, WhisperUtteranceReader>();
         services.AddScoped<IVoiceStorage, FileSystemVoiceStorage>();
+        RegisterUtteranceReader(services, builder.Configuration);
 
         services.AddSingleton<IReportRenderer, HtmlReportRenderer>();
 
@@ -85,6 +100,38 @@ public static class HostFactory
             provider.GetRequiredService<ILogger<SyncHandler>>()));
 
         return builder.Build();
+    }
+
+    /// <summary>
+    /// Три пути к тексту за одним портом. Каскад через Whisper — по умолчанию: транскрипт
+    /// нужен в любом случае, а специализированный распознаватель точнее универсальной
+    /// модели своего размера.
+    /// </summary>
+    private static void RegisterUtteranceReader(IServiceCollection services, IConfiguration configuration)
+    {
+        var kind = configuration.GetValue($"{SpeechOptions.SectionName}:Reader", SpeechReaderKind.Whisper);
+
+        switch (kind)
+        {
+            case SpeechReaderKind.NativeAudio:
+                services.AddSingleton<IUtteranceReader, NativeAudioUtteranceReader>();
+                break;
+
+            case SpeechReaderKind.Hybrid:
+                services.AddSingleton<WhisperUtteranceReader>();
+                services.AddSingleton<NativeAudioUtteranceReader>();
+                services.AddSingleton<IUtteranceReader>(provider => new HybridUtteranceReader(
+                    provider.GetRequiredService<WhisperUtteranceReader>(),
+                    provider.GetRequiredService<NativeAudioUtteranceReader>(),
+                    provider.GetRequiredService<IOptions<SpeechOptions>>(),
+                    provider.GetRequiredService<ILogger<HybridUtteranceReader>>()));
+                break;
+
+            case SpeechReaderKind.Whisper:
+            default:
+                services.AddSingleton<IUtteranceReader, WhisperUtteranceReader>();
+                break;
+        }
     }
 
     private static void RegisterMessageSource(IServiceCollection services, string? sourceSpec)

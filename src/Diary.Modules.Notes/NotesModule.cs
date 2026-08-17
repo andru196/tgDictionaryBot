@@ -43,6 +43,8 @@ public sealed class NotesModule : IDiaryModule
         services.AddScoped<IEntryExtractor, IdeaExtractor>();
         services.AddScoped<IEntryExtractor, QuestionExtractor>();
 
+        services.AddScoped<AnswerQuestionsHandler>();
+
         services.AddScoped<IReportSectionProvider, IdeasSectionProvider>();
         services.AddScoped<IReportSectionProvider, QuestionsSectionProvider>();
     }

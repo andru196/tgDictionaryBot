@@ -14,7 +14,9 @@
   <Folder Name="/tests/">
     <Project Path="tests/Diary.Application.Tests/Diary.Application.Tests.csproj" />
     <Project Path="tests/Diary.Domain.Tests/Diary.Domain.Tests.csproj" />
+    <Project Path="tests/Diary.Llm.Tests/Diary.Llm.Tests.csproj" />
     <Project Path="tests/Diary.Modules.Gi.Tests/Diary.Modules.Gi.Tests.csproj" />
     <Project Path="tests/Diary.Reporting.Tests/Diary.Reporting.Tests.csproj" />
+    <Project Path="tests/Diary.Speech.Tests/Diary.Speech.Tests.csproj" />
   </Folder>
 </Solution>

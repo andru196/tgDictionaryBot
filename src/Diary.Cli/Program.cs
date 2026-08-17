@@ -112,6 +112,39 @@ run.SetAction(async (parse, ct) =>
     return await runner.ReportAsync(subject, period, null, Granularity.Week, parse.GetValue(openOption), ct);
 });
 
+var answer = new Command("answer", "Ответить на накопленные вопросы — модель может заглянуть в дневник.");
+var reanswerOption = new Option<bool>("--reanswer") { Description = "Переписать уже имеющиеся ответы." };
+answer.Options.Add(subjectOption);
+answer.Options.Add(periodOption);
+answer.Options.Add(fromOption);
+answer.Options.Add(toOption);
+answer.Options.Add(reanswerOption);
+answer.SetAction((parse, ct) => CreateRunner(parse).AnswerAsync(
+    parse.GetValue(subjectOption),
+    ResolvePeriod(parse.GetValue(periodOption), parse.GetValue(fromOption), parse.GetValue(toOption)),
+    parse.GetValue(reanswerOption),
+    ct));
+
+var eval = new Command("eval", "Измерить качество разбора на размеченном наборе.");
+var setOption = new Option<string>("--set")
+{
+    Description = "Файл с размеченными примерами.",
+    DefaultValueFactory = _ => "fixtures/golden-ru.jsonl",
+};
+var modelOption = new Option<string?>("--model")
+{
+    Description = "Прогнать этой моделью вместо той, что в конфиге.",
+};
+var jsonOption = new Option<bool>("--json") { Description = "Вывести метрики как JSON." };
+eval.Options.Add(subjectOption);
+eval.Options.Add(setOption);
+eval.Options.Add(modelOption);
+eval.Options.Add(jsonOption);
+eval.SetAction((parse, ct) => new Runner(HostFactory.Build(
+        parse.GetValue(sourceOption), parse.GetValue(verboseOption), parse.GetValue(modelOption)))
+    .EvaluateAsync(
+        parse.GetValue(subjectOption), parse.GetValue(setOption)!, parse.GetValue(jsonOption), ct));
+
 var status = new Command("status", "Что накоплено, в каком состоянии и что в карантине.");
 status.SetAction((parse, ct) => CreateRunner(parse).StatusAsync(ct));
 
@@ -142,7 +175,8 @@ reprocess.Options.Add(sinceOption);
 reprocess.SetAction((parse, ct) => CreateRunner(parse).ReprocessAsync(
     parse.GetValue(subjectOption), parse.GetValue(fromStateOption)!, parse.GetValue(sinceOption), ct));
 
-foreach (var command in new[] { sync, transcribe, extract, report, run, status, retention, reprocess })
+foreach (var command in new[]
+         { sync, transcribe, extract, report, run, answer, eval, status, retention, reprocess })
 {
     root.Subcommands.Add(command);
 }

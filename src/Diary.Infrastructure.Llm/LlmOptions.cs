@@ -40,6 +40,12 @@ public sealed class LlmOptions
     /// <summary>Сколько раз чинить невалидный ответ, прежде чем признать разбор проваленным.</summary>
     public int RepairAttempts { get; set; } = 1;
 
+    /// <summary>
+    /// Предел циклов «модель просит инструмент → выполняем». Защита от модели,
+    /// которая ходит по кругу вместо ответа.
+    /// </summary>
+    public int MaxToolRounds { get; set; } = 4;
+
     public Dictionary<string, RoleOptions> Roles { get; } = [];
 
     public RoleOptions For(LlmRole role)

@@ -88,7 +88,7 @@ public sealed class DiaryEntry
 
     public Confidence Confidence { get; }
 
-    public string PayloadJson { get; }
+    public string PayloadJson { get; private set; }
 
     /// <summary>Модель и версия промпта — чтобы знать, что именно переразбирать после апгрейда.</summary>
     public string ExtractorVersion { get; }
@@ -140,4 +140,15 @@ public sealed class DiaryEntry
         JsonSerializer.Deserialize<TPayload>(PayloadJson, DiaryJson.Options)
         ?? throw new InvalidOperationException(
             $"Не удалось разобрать payload записи {Id} как {typeof(TPayload).Name}.");
+
+    /// <summary>
+    /// Дополняет запись тем, что стало известно позже: например, ответом на вопрос.
+    /// Категорию, время и исходник не трогает — они пришли из сообщения и неизменны.
+    /// </summary>
+    public void UpdatePayload<TPayload>(TPayload payload)
+        where TPayload : notnull
+    {
+        ArgumentNullException.ThrowIfNull(payload);
+        PayloadJson = JsonSerializer.Serialize(payload, DiaryJson.Options);
+    }
 }

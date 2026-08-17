@@ -1,9 +1,12 @@
+using System.Text.Json;
+using Diary.Application.Evaluation;
 using Diary.Application.Ports;
 using Diary.Application.Subjects;
 using Diary.Application.UseCases;
 using Diary.Cli.Configuration;
 using Diary.Domain;
 using Diary.Infrastructure.Persistence;
+using Diary.Modules.Notes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -189,6 +192,88 @@ public sealed class Runner(IHost host)
         }
 
         return 0;
+    }
+
+    public async Task<int> AnswerAsync(string? subjectKey, DateRange period, bool reanswer, CancellationToken ct)
+    {
+        var subjects = await PrepareAsync(subjectKey, ct);
+        var factory = Services.GetRequiredService<ISubjectScopeFactory>();
+
+        foreach (var subject in subjects)
+        {
+            if (!subject.Modules.Contains("notes", StringComparer.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            using var scope = factory.Create(subject);
+            var report = await scope.Resolve<AnswerQuestionsHandler>().RunAsync(period, reanswer, ct);
+
+            Console.WriteLine(
+                $"{subject.Key}: отвечено {report.Answered}, уже с ответом {report.AlreadyHadAnswers}, " +
+                $"ошибок {report.Failed}.");
+        }
+
+        return 0;
+    }
+
+    public async Task<int> EvaluateAsync(string? subjectKey, string setPath, bool asJson, CancellationToken ct)
+    {
+        var subjects = await PrepareAsync(subjectKey, ct);
+        var factory = Services.GetRequiredService<ISubjectScopeFactory>();
+        var cases = await EvaluationRunner.LoadAsync(setPath, ct);
+
+        using var scope = factory.Create(subjects[0]);
+        var report = await scope.Resolve<EvaluationRunner>().RunAsync(cases, ct);
+        var metrics = report.Metrics;
+
+        if (asJson)
+        {
+            Console.WriteLine(JsonSerializer.Serialize(metrics, DiaryJson.Indented));
+            return 0;
+        }
+
+        Console.WriteLine();
+        Console.WriteLine($"  Модель: {metrics.Model}");
+        Console.WriteLine($"  Кейсов: {metrics.Cases}");
+        Console.WriteLine();
+        Row("число фрагментов угадано", metrics.FragmentCountAccuracy, "склейка и потеря коротких хвостов");
+        Row("категории, F1", metrics.CategoryF1, "путаница «идея ↔ вопрос»");
+        Row("продукты, F1", metrics.FoodF1, "пропущенная и выдуманная еда");
+        Row("продукты, точность", metrics.FoodPrecision, "сколько названного действительно было");
+        Row("продукты, полнота", metrics.FoodRecall, "сколько бывшего названо");
+        Row("свойства пищи, F1", metrics.TagF1, "теги для статистики на малой выборке");
+        Row("вид симптома", metrics.SymptomKindAccuracy, "рефлюкс против изжоги");
+        Console.WriteLine($"  {"ошибка тяжести (MAE)",-28} {metrics.SeverityMae,6:F2}   плывущая шкала");
+        Row("доля провалов", metrics.FailureRate, "невалидный JSON после ремонта");
+        Console.WriteLine($"  {"секунд на сообщение",-28} {metrics.SecondsPerCase,6:F1}   цена прогона");
+        Console.WriteLine();
+
+        var worst = report.Results
+            .Where(r => r.Error is not null || r.ActualCategories.Count != r.Case.Categories.Count)
+            .Take(5)
+            .ToArray();
+
+        if (worst.Length > 0)
+        {
+            Console.WriteLine("  Где разошлось:");
+            foreach (var result in worst)
+            {
+                var expected = string.Join(", ", result.Case.Categories);
+                var actual = result.Error ?? string.Join(", ", result.ActualCategories);
+                Console.WriteLine($"    «{Shorten(result.Case.Text)}»");
+                Console.WriteLine($"      ждали [{expected}], получили [{actual}]");
+            }
+
+            Console.WriteLine();
+        }
+
+        return 0;
+
+        static void Row(string name, double value, string meaning) =>
+            Console.WriteLine($"  {name,-28} {value,6:P0}   {meaning}");
+
+        static string Shorten(string text) => text.Length <= 70 ? text : text[..70] + "…";
     }
 
     public async Task<int> StatusAsync(CancellationToken ct)

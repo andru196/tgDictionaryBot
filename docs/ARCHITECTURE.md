@@ -470,12 +470,12 @@ public interface IChatClientFactory { IChatClient For(LlmRole role); }
 diary sync                                     # все субъекты: забрать новое из каналов
 diary run --report                             # sync + speech + extract + отчёт, по всем
 diary report --subject me --period week --open
-diary report --subject mom --from 2026-01-01 --to 2026-12-31
-diary stats gi --subject mom --all-time --group-by month
-diary reprocess --all-subjects --from-state Transcribed --since 2026-06-01
+diary report --subject mom --from 2026-01-01 --to 2026-12-31 --group-by month
+diary answer --period month                    # ответить на накопленные вопросы
+diary eval --set fixtures/golden-ru.jsonl      # измерить качество разбора
+diary reprocess --from-state Transcribed --since 2026-06-01
 diary retention --subject me --mode delete --dry-run   # посмотреть, что удалилось бы
 diary status                                   # таблица состояний по всем субъектам
-diary watch                                    # опциональный режим «висеть и подхватывать»
 ```
 
 Без `--subject` команды чтения и разбора идут по всем субъектам из конфига, а отчёты пишутся отдельными файлами. Команды, которые **что-то меняют в Telegram** (`retention`), требуют `--subject` явно — «удалить у всех сразу» не должно набираться случайно.

@@ -1,31 +1,11 @@
 using System.Text;
 using Diary.Application.Ports;
+using Diary.Application.Speech;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Whisper.net;
 
 namespace Diary.Infrastructure.Speech;
-
-public sealed class SpeechOptions
-{
-    public const string SectionName = "Speech";
-
-    /// <summary>Whisper | NativeAudio | Hybrid. Сейчас реализован каскад через Whisper.</summary>
-    public string Reader { get; set; } = "Whisper";
-
-    public string ModelPath { get; set; } = "models/ggml-large-v3-turbo.bin";
-
-    /// <summary>Автодетект на коротких записях промахивается, поэтому язык фиксируется.</summary>
-    public string Language { get; set; } = "ru";
-
-    /// <summary>
-    /// Подсказка словаря. Заметно поднимает точность на терминах, которые модель
-    /// иначе распознаёт как похожие обиходные слова.
-    /// </summary>
-    public string InitialPrompt { get; set; } =
-        "Дневник питания и самочувствия. Изжога, рефлюкс, заброс, вздутие, отрыжка, тошнота, " +
-        "метеоризм, диарея, запор, тяжесть в желудке.";
-}
 
 /// <summary>
 /// Каскад: OGG/Opus → PCM → Whisper. Реализация по умолчанию, потому что распознавание

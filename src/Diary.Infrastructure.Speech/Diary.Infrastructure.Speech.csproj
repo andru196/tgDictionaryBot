@@ -7,4 +7,8 @@
     <PackageReference Include="Whisper.net.Runtime" />
     <PackageReference Include="Concentus" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Diary.Speech.Tests" />
+  </ItemGroup>
 </Project>
+

@@ -5,6 +5,10 @@
   <ItemGroup>
     <EmbeddedResource Include="Prompts\**\*.md" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Diary.Llm.Tests" />
+  </ItemGroup>
 </Project>
+
 
 

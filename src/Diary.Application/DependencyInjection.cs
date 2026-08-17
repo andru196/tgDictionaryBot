@@ -1,3 +1,4 @@
+using Diary.Application.Evaluation;
 using Diary.Application.Modules;
 using Diary.Application.Subjects;
 using Diary.Application.UseCases;
@@ -30,6 +31,8 @@ public static class DependencyInjection
         services.AddScoped<ExtractHandler>();
         services.AddScoped<RetentionHandler>();
         services.AddScoped<ReportHandler>();
+        services.AddScoped<DiaryQueryTool>();
+        services.AddScoped<EvaluationRunner>();
 
         return services;
     }
