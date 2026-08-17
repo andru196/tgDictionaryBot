@@ -1,3 +1,4 @@
+﻿using Diary.Application.Commands;
 using Diary.Application.Ports;
 using Diary.Application.Subjects;
 using Diary.Domain;
@@ -5,13 +6,17 @@ using Microsoft.Extensions.Logging;
 
 namespace Diary.Application.UseCases;
 
+/// <param name="Subject">Кому отвечать: команда исполняется в контексте своего субъекта.</param>
+public sealed record PendingCommand(SubjectKey Subject, long PeerId, long MessageId, ChatCommand Command);
+
 public sealed record SyncReport(
     int Fetched,
     int Stored,
     int Quarantined,
     int Skipped,
     int Superseded,
-    IReadOnlyDictionary<string, int> PerSubject);
+    IReadOnlyDictionary<string, int> PerSubject,
+    IReadOnlyList<PendingCommand> Commands);
 
 /// <summary>
 /// Забирает новое из Telegram и раскладывает по субъектам. Курсор двигается только после
@@ -36,7 +41,7 @@ public sealed class SyncHandler(
         if (peerNames.Length == 0)
         {
             logger.LogWarning("Ни у одного субъекта не задан источник сообщений.");
-            return new SyncReport(0, 0, 0, 0, 0, new Dictionary<string, int>());
+            return new SyncReport(0, 0, 0, 0, 0, new Dictionary<string, int>(), []);
         }
 
         var resolved = await source.ResolvePeersAsync(peerNames, ct);
@@ -50,6 +55,11 @@ public sealed class SyncHandler(
 
         int fetched = 0, stored = 0, quarantined = 0, skipped = 0, superseded = 0;
         var perSubject = new Dictionary<string, int>();
+        var commands = new List<PendingCommand>();
+
+        // Первый проход вычитывает всю историю; исполнять найденные там команды
+        // означало бы завалить человека отчётами за прошлый год.
+        var commandHorizon = clock.GetUtcNow() - CommandFreshness;
 
         try
         {
@@ -86,6 +96,23 @@ public sealed class SyncHandler(
                     }
 
                     var subjectKey = ((SubjectRouting.Assigned)routing).Subject;
+
+                    // Команда — это управление, а не запись дневника: в базу она не идёт.
+                    if (ChatCommandParser.IsCommand(incoming.Text))
+                    {
+                        if (incoming.SentAtUtc >= commandHorizon &&
+                            ChatCommandParser.TryParse(incoming.Text, clock.GetUtcNow()) is { } command)
+                        {
+                            commands.Add(new PendingCommand(
+                                subjectKey, incoming.PeerId, incoming.TelegramMessageId, command));
+                        }
+
+                        skipped++;
+                        highWater = Math.Max(highWater, incoming.TelegramMessageId);
+                        await cursors.SaveAsync(new SyncCursor(peerId, highWater, clock.GetUtcNow()), ct);
+                        continue;
+                    }
+
                     if (!scopes.TryGetValue(subjectKey, out var scope))
                     {
                         scopes[subjectKey] = scope = scopeFactory.Create(subjectKey);
@@ -129,8 +156,14 @@ public sealed class SyncHandler(
             }
         }
 
-        return new SyncReport(fetched, stored, quarantined, skipped, superseded, perSubject);
+        return new SyncReport(fetched, stored, quarantined, skipped, superseded, perSubject, commands);
     }
+
+    /// <summary>
+    /// Насколько свежей должна быть команда, чтобы её исполнить. Всё старше —
+    /// история, а не запрос.
+    /// </summary>
+    private static readonly TimeSpan CommandFreshness = TimeSpan.FromMinutes(15);
 
     private enum StoreOutcome { Stored, Duplicate, Superseded, Unsupported }
 
@@ -232,3 +265,4 @@ public sealed class SyncHandler(
         return tags is null ? [] : tags;
     }
 }
+

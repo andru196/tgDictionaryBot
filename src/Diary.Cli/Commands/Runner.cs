@@ -33,9 +33,7 @@ public sealed class Runner(IHost host)
     public async Task<int> SyncAsync(string? subjectKey, CancellationToken ct)
     {
         var subjects = await PrepareAsync(subjectKey, ct);
-        var handler = Services.GetRequiredService<SyncHandler>();
-
-        var report = await handler.RunAsync(subjects, ct);
+        var report = await Services.GetRequiredService<SyncHandler>().RunAsync(subjects, ct);
 
         Console.WriteLine(
             $"Синхронизация: получено {report.Fetched}, сохранено {report.Stored}, " +
@@ -51,7 +49,78 @@ public sealed class Runner(IHost host)
             Console.WriteLine("  Разобрать карантин: diary status");
         }
 
+        await ExecuteCommandsAsync(report.Commands, ct);
         return 0;
+    }
+
+    /// <summary>Исполняет команды, присланные в чат, и отвечает туда же.</summary>
+    private async Task ExecuteCommandsAsync(IReadOnlyList<PendingCommand> commands, CancellationToken ct)
+    {
+        if (commands.Count == 0)
+        {
+            return;
+        }
+
+        var factory = Services.GetRequiredService<ISubjectScopeFactory>();
+        var config = Services.GetRequiredService<DiaryConfig>();
+
+        foreach (var command in commands)
+        {
+            using var scope = factory.Create(command.Subject);
+            await scope.Resolve<ChatCommandHandler>().ExecuteAsync(command, config.ReportDirectory, ct);
+
+            Console.WriteLine($"  команда от «{command.Subject}»: {command.Command.GetType().Name}");
+        }
+    }
+
+    /// <summary>
+    /// Висит и реагирует на новые сообщения. Опроса нет: Telegram сам присылает события,
+    /// поэтому в простое трафика тоже нет.
+    /// </summary>
+    public async Task<int> WatchAsync(string? subjectKey, CancellationToken ct)
+    {
+        var subjects = await PrepareAsync(subjectKey, ct);
+
+        if (Services.GetRequiredService<IMessageSource>() is not IIncomingMessageWatcher watcher)
+        {
+            Console.Error.WriteLine("Этот источник не умеет ждать события. Убери --source file:…");
+            return 1;
+        }
+
+        // Первый проход: забрать накопившееся и заодно разрешить peer'ы,
+        // без которых слушать нечего.
+        await ProcessOnceAsync(subjects, ct);
+
+        var source = Services.GetRequiredService<IMessageSource>();
+        var peerNames = subjects.SelectMany(s => s.Sources).Select(s => s.Peer).Distinct().ToArray();
+        var peers = await source.ResolvePeersAsync(peerNames, ct);
+
+        await watcher.ListenAsync(
+            [.. peers.Values.Distinct()],
+            async token => await ProcessOnceAsync(subjects, token),
+            ct);
+
+        return 0;
+    }
+
+    private async Task ProcessOnceAsync(IReadOnlyList<SubjectDefinition> subjects, CancellationToken ct)
+    {
+        var report = await Services.GetRequiredService<SyncHandler>().RunAsync(subjects, ct);
+
+        if (report.Stored > 0 || report.Superseded > 0)
+        {
+            Console.WriteLine($"Новых сообщений: {report.Stored + report.Superseded}.");
+
+            var factory = Services.GetRequiredService<ISubjectScopeFactory>();
+            foreach (var subject in subjects)
+            {
+                using var scope = factory.Create(subject);
+                await scope.Resolve<TranscribeHandler>().RunAsync(16, ct);
+                await scope.Resolve<ExtractHandler>().RunAsync(16, ct);
+            }
+        }
+
+        await ExecuteCommandsAsync(report.Commands, ct);
     }
 
     public async Task<int> TranscribeAsync(string? subjectKey, CancellationToken ct)
@@ -274,6 +343,48 @@ public sealed class Runner(IHost host)
             Console.WriteLine($"  {name,-28} {value,6:P0}   {meaning}");
 
         static string Shorten(string text) => text.Length <= 70 ? text : text[..70] + "…";
+    }
+
+    public async Task<int> SetupChatAsync(
+        string title, IReadOnlyList<string> invite, string subjectKey, CancellationToken ct)
+    {
+        if (Services.GetService<IMessageSource>() is not IChatAdministration administration)
+        {
+            Console.Error.WriteLine(
+                "Создание чата доступно только через Telegram. Убери --source file:…");
+            return 1;
+        }
+
+        var chat = await administration.CreateGroupAsync(title, invite, ct);
+
+        Console.WriteLine();
+        Console.WriteLine($"  Чат «{chat.Title}» создан, id {chat.PeerId}.");
+
+        if (chat.NotInvited.Count > 0)
+        {
+            Console.WriteLine(
+                $"  Не удалось пригласить: {string.Join(", ", chat.NotInvited)} — " +
+                "настройки приватности. Пригласи ссылкой вручную.");
+        }
+
+        Console.WriteLine();
+        Console.WriteLine("  Впиши в docker/appsettings.Local.json:");
+        Console.WriteLine();
+        Console.WriteLine($$"""
+            {
+              "Key": "{{subjectKey}}",
+              "DisplayName": "Я",
+              "TimeZone": "Europe/Moscow",
+              "Modules": [ "gi", "notes" ],
+              "Sources": [
+                { "Peer": "{{chat.PeerId}}", "SenderIds": [ {{chat.MyUserId}} ] }
+              ],
+              "Retention": { "Mode": "Keep", "DryRun": true }
+            }
+        """);
+        Console.WriteLine();
+
+        return 0;
     }
 
     public async Task<int> StatusAsync(bool details, CancellationToken ct)

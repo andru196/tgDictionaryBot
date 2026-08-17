@@ -1,4 +1,4 @@
-using Diary.Domain;
+﻿using Diary.Domain;
 
 namespace Diary.Application.Ports;
 
@@ -62,6 +62,31 @@ public interface IMessageSource : IAsyncDisposable
 }
 
 /// <summary>
+/// Ответ в тот же чат. Отдельный порт от чтения: файловый источник умеет читать,
+/// но отвечать ему некуда, и заставлять его притворяться незачем.
+/// </summary>
+public interface IChatResponder
+{
+    Task SendTextAsync(long peerId, string text, long? replyToMessageId, CancellationToken ct);
+
+    Task SendDocumentAsync(
+        long peerId, string filePath, string caption, long? replyToMessageId, CancellationToken ct);
+}
+
+/// <summary>
+/// Источник, умеющий ждать новые сообщения вместо опроса. Telegram сам присылает
+/// события, поэтому в простое трафика нет вовсе.
+/// </summary>
+public interface IIncomingMessageWatcher
+{
+    /// <param name="onNewMessage">Вызывается, когда в отслеживаемом чате что-то появилось.</param>
+    Task ListenAsync(
+        IReadOnlyCollection<long> peerIds,
+        Func<CancellationToken, Task> onNewMessage,
+        CancellationToken ct);
+}
+
+/// <summary>
 /// Докуда дочитан чат. Хранится локально, а не в Telegram: прочитанность в мессенджере
 /// меняется с телефона и к состоянию обработки отношения не имеет.
 /// </summary>
@@ -73,3 +98,4 @@ public interface ISyncCursorStore
 
     Task SaveAsync(SyncCursor cursor, CancellationToken ct);
 }
+

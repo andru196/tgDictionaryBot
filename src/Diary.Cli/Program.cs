@@ -1,4 +1,4 @@
-using System.CommandLine;
+﻿using System.CommandLine;
 using System.Globalization;
 using Diary.Cli;
 using Diary.Cli.Commands;
@@ -145,6 +145,36 @@ eval.SetAction((parse, ct) => new Runner(HostFactory.Build(
     .EvaluateAsync(
         parse.GetValue(subjectOption), parse.GetValue(setOption)!, parse.GetValue(jsonOption), ct));
 
+var watch = new Command("watch", "Висеть и реагировать на новые сообщения и команды в чате.");
+watch.Options.Add(subjectOption);
+watch.SetAction((parse, ct) => CreateRunner(parse).WatchAsync(parse.GetValue(subjectOption), ct));
+
+var setupChat = new Command("setup-chat", "Создать групповой чат под дневник и позвать туда людей.");
+var titleOption = new Option<string>("--title")
+{
+    Description = "Название чата.",
+    DefaultValueFactory = _ => "Дневник",
+};
+var inviteOption = new Option<string[]>("--invite")
+{
+    Description = "Кого пригласить. Повторить для нескольких: --invite @a --invite @b.",
+    // Без этого опция жадно съедает следующий флаг как ещё одно имя.
+    AllowMultipleArgumentsPerToken = false,
+};
+var keyOption = new Option<string>("--key")
+{
+    Description = "Ключ субъекта для готового фрагмента конфигурации.",
+    DefaultValueFactory = _ => "me",
+};
+setupChat.Options.Add(titleOption);
+setupChat.Options.Add(inviteOption);
+setupChat.Options.Add(keyOption);
+setupChat.SetAction((parse, ct) => CreateRunner(parse).SetupChatAsync(
+    parse.GetValue(titleOption)!,
+    parse.GetValue(inviteOption) ?? [],
+    parse.GetValue(keyOption)!,
+    ct));
+
 var status = new Command("status", "Что накоплено, в каком состоянии и что в карантине.");
 var detailsOption = new Option<bool>("--details")
 {
@@ -181,7 +211,7 @@ reprocess.SetAction((parse, ct) => CreateRunner(parse).ReprocessAsync(
     parse.GetValue(subjectOption), parse.GetValue(fromStateOption)!, parse.GetValue(sinceOption), ct));
 
 foreach (var command in new[]
-         { sync, transcribe, extract, report, run, answer, eval, status, retention, reprocess })
+         { sync, transcribe, extract, report, run, answer, eval, status, retention, reprocess, watch, setupChat })
 {
     root.Subcommands.Add(command);
 }
@@ -216,3 +246,4 @@ static Granularity ParseGranularity(string? value) =>
         "month" => Granularity.Month,
         _ => Granularity.Week,
     };
+

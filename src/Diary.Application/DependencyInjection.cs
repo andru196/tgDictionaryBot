@@ -33,6 +33,7 @@ public static class DependencyInjection
         services.AddScoped<ReportHandler>();
         services.AddScoped<DiaryQueryTool>();
         services.AddScoped<EvaluationRunner>();
+        services.AddScoped<ChatCommandHandler>();
 
         return services;
     }

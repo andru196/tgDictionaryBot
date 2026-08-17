@@ -1,4 +1,4 @@
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using Diary.Application.Ports;
 using Diary.Domain;
 using Microsoft.Extensions.Logging;
@@ -37,13 +37,13 @@ public sealed class TelegramOptions
 /// Чтение истории через MTProto под личным аккаунтом. Именно это снимает ограничение
 /// Bot API в 24 часа: история читается целиком, а медиа скачивается спустя годы.
 /// </summary>
-public sealed class TelegramMessageSource : IMessageSource
+public sealed class TelegramMessageSource : IMessageSource, IChatAdministration, IChatResponder, IIncomingMessageWatcher
 {
     private readonly TelegramOptions _options;
     private readonly ILogger<TelegramMessageSource> _logger;
     private readonly WTelegram.Client _client;
     private readonly Dictionary<long, InputPeer> _peers = [];
-    private bool _loggedIn;
+    private User? _me;
 
     public TelegramMessageSource(IOptions<TelegramOptions> options, ILogger<TelegramMessageSource> logger)
     {
@@ -352,16 +352,171 @@ public sealed class TelegramMessageSource : IMessageSource
         _ = ct;
     }
 
-    private async Task EnsureLoggedInAsync()
+    public async Task SendTextAsync(
+        long peerId, string text, long? replyToMessageId, CancellationToken ct)
     {
-        if (_loggedIn)
+        await EnsureLoggedInAsync();
+
+        if (!_peers.TryGetValue(peerId, out var peer))
         {
+            _logger.LogWarning("Некуда отвечать: чат {Peer} не разрешён.", peerId);
             return;
+        }
+
+        await _client.SendMessageAsync(peer, text, reply_to_msg_id: (int)(replyToMessageId ?? 0));
+        _ = ct;
+    }
+
+    public async Task SendDocumentAsync(
+        long peerId, string filePath, string caption, long? replyToMessageId, CancellationToken ct)
+    {
+        await EnsureLoggedInAsync();
+
+        if (!_peers.TryGetValue(peerId, out var peer))
+        {
+            _logger.LogWarning("Некуда отправлять файл: чат {Peer} не разрешён.", peerId);
+            return;
+        }
+
+        // Отчёт уходит документом, а не текстом: это самодостаточный HTML,
+        // который надо открыть, а не прочитать в ленте.
+        var uploaded = await _client.UploadFileAsync(filePath);
+        await _client.SendMediaAsync(
+            peer, caption, uploaded, reply_to_msg_id: (int)(replyToMessageId ?? 0));
+        _ = ct;
+    }
+
+    /// <summary>
+    /// Ждёт события от Telegram вместо опроса. В простое запросов нет вообще:
+    /// сервер держит соединение и присылает обновления сам.
+    /// </summary>
+    public async Task ListenAsync(
+        IReadOnlyCollection<long> peerIds,
+        Func<CancellationToken, Task> onNewMessage,
+        CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(peerIds);
+        ArgumentNullException.ThrowIfNull(onNewMessage);
+
+        await EnsureLoggedInAsync();
+
+        var watched = peerIds.ToHashSet();
+        var signal = new SemaphoreSlim(0, 1);
+
+        Task Handle(UpdatesBase updates)
+        {
+            foreach (var update in updates.UpdateList)
+            {
+                // UpdateNewChannelMessage наследует UpdateNewMessage, так что одного
+                // шаблона хватает и на группы, и на каналы.
+                if (update is UpdateNewMessage { message: Message message } &&
+                    message.peer_id?.ID is { } id &&
+                    watched.Contains(id))
+                {
+                    // Сигналим, а не обрабатываем прямо здесь: обработчик событий
+                    // библиотеки не место для длинного пайплайна с моделью.
+                    if (signal.CurrentCount == 0)
+                    {
+                        signal.Release();
+                    }
+
+                    break;
+                }
+            }
+
+            return Task.CompletedTask;
+        }
+
+        _client.OnUpdates += Handle;
+
+        try
+        {
+            _logger.LogInformation("Слушаю {Count} чат(ов). Ctrl+C — выход.", watched.Count);
+
+            while (!ct.IsCancellationRequested)
+            {
+                await signal.WaitAsync(ct);
+
+                // Небольшая пауза: серия голосовых подряд обработается одним проходом,
+                // а не тремя, и Telegram не получит три всплеска запросов.
+                await Task.Delay(TimeSpan.FromSeconds(2), ct);
+                await onNewMessage(ct);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("Остановлено.");
+        }
+        finally
+        {
+            _client.OnUpdates -= Handle;
+            signal.Dispose();
+        }
+    }
+
+    public async Task<CreatedChat> CreateGroupAsync(
+        string title, IReadOnlyList<string> usernames, CancellationToken ct)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(title);
+        ArgumentNullException.ThrowIfNull(usernames);
+
+        var me = await EnsureLoggedInAsync();
+
+        var invited = new List<InputUserBase>();
+        var notInvited = new List<string>();
+
+        foreach (var username in usernames)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            try
+            {
+                var resolved = await _client.Contacts_ResolveUsername(username.TrimStart('@'));
+                if (resolved.User is { } user)
+                {
+                    invited.Add(new InputUser(user.id, user.access_hash));
+                }
+                else
+                {
+                    notInvited.Add(username);
+                }
+            }
+            catch (RpcException ex)
+            {
+                // Приватность может запрещать добавление в группы — это не повод
+                // не создавать чат: пригласить можно потом ссылкой.
+                _logger.LogWarning("Не удалось пригласить {User}: {Error}", username, ex.Message);
+                notInvited.Add(username);
+            }
+        }
+
+        var created = await _client.Messages_CreateChat([.. invited], title);
+        var chat = created.updates.Chats.Values.FirstOrDefault()
+            ?? throw new InvalidOperationException("Telegram не вернул созданный чат.");
+
+        // Кого приватность не пустила — Telegram сообщает отдельно, а не ошибкой.
+        foreach (var missing in created.missing_invitees ?? [])
+        {
+            notInvited.Add(missing.user_id.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
+
+        _peers[chat.ID] = chat.ToInputPeer();
+        _logger.LogInformation("Создан чат «{Title}», id {Id}.", chat.Title, chat.ID);
+
+        return new CreatedChat(chat.ID, chat.Title, me.ID, notInvited);
+    }
+
+    private async Task<User> EnsureLoggedInAsync()
+    {
+        if (_me is { } cached)
+        {
+            return cached;
         }
 
         var user = await _client.LoginUserIfNeeded();
         _logger.LogInformation("Вход выполнен: {User} (id {Id}).", user.MainUsername ?? user.first_name, user.ID);
-        _loggedIn = true;
+        _me = user;
+        return user;
     }
 
     public ValueTask DisposeAsync()
@@ -370,3 +525,5 @@ public sealed class TelegramMessageSource : IMessageSource
         return ValueTask.CompletedTask;
     }
 }
+
+

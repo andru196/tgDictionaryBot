@@ -50,6 +50,20 @@ services:
     stdin_open: true
     tty: true
 
+  # Постоянно работающий режим: висит и реагирует на новые сообщения и команды.
+  # Опроса нет — Telegram сам присылает события, в простое трафика ноль.
+  #
+  #   docker compose --profile watch up -d watcher
+  #   docker compose --profile watch logs -f watcher
+  #
+  # Вход должен быть выполнен заранее (docker compose run --rm diary sync):
+  # код подтверждения вводится в терминале, а у демона его нет.
+  watcher:
+    <<: *diary-common
+    profiles: ["watch"]
+    command: ["watch"]
+    restart: unless-stopped
+
   # Прогон тестов в том же окружении, где собирается рабочий образ.
   tests:
     build:

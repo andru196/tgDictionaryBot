@@ -88,6 +88,12 @@ public static class HostFactory
 
         RegisterMessageSource(services, sourceSpec);
 
+        // Отвечать в чат умеет не всякий источник: файловому отвечать некуда.
+        // Тогда ответ печатается в консоль — видно, что бы ушло в Telegram.
+        services.AddSingleton<IChatResponder>(provider =>
+            provider.GetRequiredService<IMessageSource>() as IChatResponder
+            ?? new ConsoleChatResponder(provider.GetRequiredService<ILogger<ConsoleChatResponder>>()));
+
         // SyncHandler живёт вне скоупа субъекта: он и решает, чей это субъект.
         services.AddSingleton(provider => new SyncHandler(
             provider.GetRequiredService<IMessageSource>(),
