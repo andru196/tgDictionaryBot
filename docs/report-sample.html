@@ -3,25 +3,29 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Дневник · 10–16 августа 2026</title>
+<title>Дневник · 1 июня — 16 августа 2026</title>
 <!--
   ШАБЛОН ОТЧЁТА. Данные ниже — выдуманные, для превью вёрстки.
-  Соответствие Razor-компонентам (Diary.Infrastructure.Reporting):
+  Период произвольный: всё, что видно, строится по GiStatsQuery(Period, Granularity, CompareTo).
 
-    Report.razor                     — этот документ целиком, <style> инлайном
-    Sections/Header.razor            — .masthead + .stats
-    Sections/GiDashboard.razor       — секция «Пищеварение»
-      Parts/Heatmap.razor            — .heatmap
-      Parts/DayTimeline.razor        — svg.timeline
-      Parts/SuspectTable.razor       — table.suspects (продукты и теги)
-      Parts/CleanList.razor          — .chips.clean
-      Parts/SymptomTotals.razor      — .totals
-    Sections/Ideas.razor             — .cards
-    Sections/Questions.razor         — .qlist
-    Sections/RawLog.razor            — details.rawlog
+  Соответствие Razor-компонентам:
+
+    Report.razor                          — документ целиком, <style> инлайном
+    Sections/Header.razor                 — .masthead + .stats
+    Modules/Gi/Sections/GiDashboard.razor — секция «Пищеварение»
+      Parts/TrendChart.razor              — svg.trend + .compare
+      Parts/Heatmap.razor                 — .heatmap
+      Parts/DayTimeline.razor             — svg.timeline
+      Parts/SuspectTable.razor            — table.suspects (продукты и свойства)
+      Parts/WindowCalibration.razor       — .calib
+      Parts/ToleratedList.razor           — .chips.clean
+      Parts/SymptomTotals.razor           — .totals
+    Modules/Notes/Sections/Ideas.razor    — .cards
+    Modules/Notes/Sections/Questions.razor— .qlist
+    Sections/RawLog.razor                 — details.rawlog
 
   Правила: ноль внешних запросов (CSS/SVG инлайн), ноль вычислений в разметке —
-  всё приходит готовым из ReportViewModel.
+  всё приходит готовым из ViewModel, включая координаты SVG.
 -->
 <style>
 :root{
@@ -64,25 +68,44 @@ h1,h2,h3{font-family:ui-serif,Georgia,"Times New Roman",serif; font-weight:600; 
 
 /* ── секции ──────────────────────────────────────────────── */
 section{margin-top:56px}
-.sec-head{display:flex; align-items:baseline; gap:12px; margin-bottom:20px}
+.sec-head{display:flex; align-items:baseline; gap:12px; margin-bottom:20px; flex-wrap:wrap}
 .sec-head h2{font-size:26px}
 .sec-head .count{font-size:13px; color:var(--muted); background:var(--surface-2);
   border:1px solid var(--border-soft); padding:2px 9px; border-radius:99px}
-.sec-head .rule{flex:1; height:1px; background:var(--border)}
-.lead{color:var(--muted); margin:-8px 0 22px; max-width:66ch}
+.sec-head .rule{flex:1; height:1px; background:var(--border); min-width:20px}
+.lead{color:var(--muted); margin:-8px 0 22px; max-width:70ch}
 
 .card{background:var(--surface); border:1px solid var(--border); border-radius:14px;
   padding:22px 24px; box-shadow:var(--shadow)}
 .card + .card{margin-top:18px}
-.card h3{font-size:16.5px; margin-bottom:14px}
-.card .hint{font-size:12.5px; color:var(--muted); margin-top:12px}
+.card h3{font-size:16.5px; margin-bottom:14px; display:flex; align-items:baseline; gap:10px; flex-wrap:wrap}
+.card .hint{font-size:12.5px; color:var(--muted); margin-top:12px; margin-bottom:0}
+
+/* ── тренд ───────────────────────────────────────────────── */
+.trend{width:100%; height:auto; display:block}
+.tr-bar{fill:var(--gi); opacity:.32}
+.tr-line{fill:none; stroke:var(--gi); stroke-width:2; stroke-linejoin:round}
+.tr-pt{fill:var(--surface); stroke:var(--gi); stroke-width:2}
+.tr-base{stroke:var(--border); stroke-width:1}
+.tr-lbl{fill:var(--muted); font-size:11px; font-family:inherit}
+.tr-mark{stroke:var(--clean); stroke-width:1.5; stroke-dasharray:4 4}
+.tr-mark-lbl{fill:var(--clean); font-size:11px; font-family:inherit}
+
+.compare{display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:1px;
+  background:var(--border-soft); border:1px solid var(--border-soft); border-radius:12px;
+  overflow:hidden; margin-top:20px}
+.cmp{background:var(--surface); padding:14px 16px}
+.cmp .k{font-size:12px; color:var(--muted)}
+.cmp .v{font-size:20px; font-family:ui-serif,Georgia,serif; letter-spacing:-.02em; margin-top:2px}
+.cmp .d{font-size:12.5px; margin-top:3px; font-variant-numeric:tabular-nums}
+.cmp .d.good{color:var(--clean)} .cmp .d.bad{color:var(--gi)}
 
 /* ── тепловая карта ──────────────────────────────────────── */
 .heatmap{display:grid; grid-auto-flow:column; grid-template-rows:repeat(7,1fr); gap:4px}
 .heatmap i{width:100%; aspect-ratio:1; border-radius:3px; background:var(--h0); display:block}
 .heatmap i.l1{background:var(--h1)} .heatmap i.l2{background:var(--h2)}
 .heatmap i.l3{background:var(--h3)} .heatmap i.l4{background:var(--h4)}
-.hm-legend{display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); margin-top:12px}
+.hm-legend{display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); margin-top:12px; flex-wrap:wrap}
 .hm-legend i{width:11px; height:11px; border-radius:3px; display:inline-block}
 
 /* ── таймлайн ────────────────────────────────────────────── */
@@ -94,12 +117,15 @@ section{margin-top:56px}
 .tl-meal{fill:var(--surface); stroke:var(--muted); stroke-width:1.4}
 .tl-meal.flag{fill:var(--gi-soft); stroke:var(--gi); stroke-width:1.6}
 .tl-sym{fill:var(--gi); opacity:.85}
-.tl-link{stroke:var(--gi); stroke-width:1.2; stroke-dasharray:2 3; opacity:.55}
+.tl-link{stroke:var(--gi); stroke-width:1.4; opacity:.7}
+.tl-link.guess{stroke-dasharray:2 3; opacity:.4}
 .legend{display:flex; flex-wrap:wrap; gap:18px; font-size:12.5px; color:var(--muted); margin-top:14px}
 .legend span{display:flex; align-items:center; gap:7px}
 .dot{width:10px; height:10px; border-radius:50%; border:1.4px solid var(--muted); background:var(--surface)}
 .dot.flag{border-color:var(--gi); background:var(--gi-soft)}
 .bar{width:5px; height:13px; border-radius:1px; background:var(--gi); opacity:.85}
+.ln{width:20px; height:0; border-top:1.4px solid var(--gi); opacity:.7}
+.ln.guess{border-top-style:dashed; opacity:.45}
 
 /* ── таблицы ─────────────────────────────────────────────── */
 table{width:100%; border-collapse:collapse; font-size:14px}
@@ -109,14 +135,15 @@ td{padding:11px 10px 11px 0; border-bottom:1px solid var(--border-soft); vertica
 tr:last-child td{border-bottom:0}
 td.num{font-variant-numeric:tabular-nums; white-space:nowrap}
 .food{font-weight:500}
-.liftbar{position:relative; min-width:118px}
+.liftbar{position:relative; min-width:104px}
 .liftbar em{position:absolute; inset:0; background:var(--gi); opacity:.16; border-radius:3px}
 .liftbar b{position:relative; font-variant-numeric:tabular-nums; font-weight:600; padding-left:7px; color:var(--gi)}
 .tag{display:inline-block; font-size:11.5px; padding:1px 8px; border-radius:99px;
   background:var(--surface-2); border:1px solid var(--border-soft); color:var(--muted)}
-.tag.weak{color:var(--muted)}
 .tag.solid{background:var(--gi-soft); border-color:transparent; color:var(--gi)}
 .tag.ok{background:var(--clean-soft); border-color:transparent; color:var(--clean)}
+.conf{font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap}
+.conf b{color:var(--gi); font-weight:600}
 
 .chips{display:flex; flex-wrap:wrap; gap:8px}
 .chips span{border:1px solid var(--border); border-radius:99px; padding:5px 13px; font-size:13.5px; background:var(--surface)}
@@ -129,13 +156,23 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap}
 .total span{font-size:12.5px; color:var(--muted)}
 .total .sev{display:block; font-size:12px; color:var(--gi); margin-top:5px}
 
+/* ── калибровка окон ─────────────────────────────────────── */
+.calib{display:grid; gap:12px}
+.cal-row{display:grid; grid-template-columns:130px 1fr 118px; gap:14px; align-items:center; font-size:13.5px}
+.cal-track{position:relative; height:22px; background:var(--surface-2); border-radius:6px; overflow:hidden}
+.cal-def{position:absolute; top:0; bottom:0; background:var(--border); opacity:.85}
+.cal-new{position:absolute; top:0; bottom:0; background:var(--gi); opacity:.5; border-radius:4px}
+.cal-val{color:var(--muted); font-variant-numeric:tabular-nums; text-align:right; font-size:12.5px}
+.cal-scale{display:flex; justify-content:space-between; font-size:11px; color:var(--muted);
+  margin-left:144px; margin-right:132px}
+
 /* ── идеи ────────────────────────────────────────────────── */
 .cards{display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px}
 .idea{background:var(--surface); border:1px solid var(--border); border-left:3px solid var(--idea);
   border-radius:12px; padding:18px 20px; box-shadow:var(--shadow)}
-.idea h3{font-size:16px; margin-bottom:8px; line-height:1.35}
+.idea h3{font-size:16px; margin-bottom:8px; line-height:1.35; display:block}
 .idea p{margin:0; color:var(--muted); font-size:14px}
-.idea footer{display:flex; align-items:center; gap:8px; margin-top:14px; font-size:12px; color:var(--muted)}
+.idea footer{display:flex; align-items:center; gap:8px; margin-top:14px; font-size:12px; color:var(--muted); flex-wrap:wrap}
 .theme{display:inline-block; font-size:11.5px; padding:1px 9px; border-radius:99px;
   background:var(--idea-soft); color:var(--idea)}
 .badge-do{font-size:11.5px; padding:1px 9px; border-radius:99px; background:var(--gi-soft); color:var(--gi)}
@@ -143,7 +180,7 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap}
 
 /* ── вопросы ─────────────────────────────────────────────── */
 .qgroup{margin-bottom:26px}
-.qgroup > h3{font-size:13px; letter-spacing:.09em; text-transform:uppercase; color:var(--question); margin-bottom:12px}
+.qgroup > h3{font-size:13px; letter-spacing:.09em; text-transform:uppercase; color:var(--question); margin-bottom:12px; display:block}
 .qlist{list-style:none; margin:0; padding:0}
 .qlist li{display:flex; gap:13px; padding:13px 0; border-bottom:1px solid var(--border-soft)}
 .qlist li:last-child{border-bottom:0}
@@ -170,16 +207,18 @@ td.num{font-variant-numeric:tabular-nums; white-space:nowrap}
 footer.colophon{margin-top:64px; padding-top:22px; border-top:1px solid var(--border);
   font-size:12.5px; color:var(--muted); display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap}
 
-@media (max-width:640px){
+@media (max-width:700px){
   .wrap{padding:32px 16px 64px}
   .masthead h1{font-size:30px}
   .entry{grid-template-columns:1fr; gap:4px}
+  .cal-row{grid-template-columns:100px 1fr; }
+  .cal-val{grid-column:1/-1; text-align:left}
+  .cal-scale{display:none}
 }
 @media print{
   :root{--bg:#fff; --surface:#fff; --shadow:none}
   .wrap{max-width:none; padding:0}
-  section{break-inside:avoid}
-  .card,.idea{break-inside:avoid}
+  section, .card, .idea{break-inside:avoid}
   .rawlog[open] > summary{display:none}
 }
 </style>
@@ -189,26 +228,75 @@ footer.colophon{margin-top:64px; padding-top:22px; border-top:1px solid var(--bo
 
 <!-- ══ Sections/Header.razor ══════════════════════════════ -->
 <header class="masthead">
-  <div class="eyebrow">Личный дневник · отчёт</div>
-  <h1>Неделя 33</h1>
-  <div class="period">10 — 16 августа 2026 · сгенерировано 17 августа в 09:14</div>
+  <div class="eyebrow">Дневник · Андрей · отчёт за произвольный период</div>
+  <h1>Лето 2026</h1>
+  <div class="period">1 июня — 16 августа · 77 дней · сравнение с 16 марта — 31 мая · собрано 17 августа в 09:14</div>
   <div class="stats">
-    <div class="stat"><b>47</b><span>сообщений</span></div>
-    <div class="stat"><b>18</b><span>голосовых</span></div>
-    <div class="stat"><b>24 мин</b><span>речи расшифровано</span></div>
-    <div class="stat"><b>63</b><span>записи извлечено</span></div>
-    <div class="stat"><b>5</b><span>симптомов</span></div>
-    <div class="stat"><b>2</b><span>чистых дня</span></div>
+    <div class="stat"><b>612</b><span>сообщений</span></div>
+    <div class="stat"><b>241</b><span>голосовых</span></div>
+    <div class="stat"><b>5 ч 12 м</b><span>речи расшифровано</span></div>
+    <div class="stat"><b>894</b><span>записи извлечено</span></div>
+    <div class="stat"><b>76</b><span>эпизодов симптомов</span></div>
+    <div class="stat"><b>41 %</b><span>чистых дней</span></div>
   </div>
 </header>
 
-<!-- ══ Sections/GiDashboard.razor ═════════════════════════ -->
+<!-- ══ Modules/Gi/Sections/GiDashboard.razor ══════════════ -->
 <section>
-  <div class="sec-head"><h2>Пищеварение</h2><span class="count">21 приём пищи · 5 симптомов</span><div class="rule"></div></div>
-  <p class="lead">Таймлайн — за отчётную неделю. Корреляции ниже считаются по всей истории наблюдений (86 дней), иначе выборка слишком мала для выводов.</p>
+  <div class="sec-head"><h2>Пищеварение</h2><span class="count">198 приёмов пищи · 76 симптомов · 77 дней</span><div class="rule"></div></div>
+  <p class="lead">Период задан произвольно, все цифры пересчитаны под него: базовая частота, окна и пороги считаются внутри интервала, а приёмы пищи подгружаются с запасом до его начала — иначе первые часы периода систематически выглядели бы чистыми.</p>
 
   <div class="card">
-    <h3>Тяжесть симптомов по дням · последние 8 недель</h3>
+    <h3>Динамика по неделям <span class="tag">эпизодов · средняя тяжесть</span></h3>
+    <svg class="trend" viewBox="0 0 960 186" role="img" aria-label="Число эпизодов симптомов и средняя тяжесть по неделям">
+      <line class="tr-base" x1="64" y1="150" x2="940" y2="150"/>
+      <g class="tr-lbl">
+        <text x="52" y="55" text-anchor="end">9</text>
+        <text x="52" y="105" text-anchor="end">4</text>
+        <text x="52" y="154" text-anchor="end">0</text>
+      </g>
+
+      <rect class="tr-bar" x="82"  y="62"  width="44" height="88" rx="3"/>
+      <rect class="tr-bar" x="161" y="73"  width="44" height="77" rx="3"/>
+      <rect class="tr-bar" x="241" y="51"  width="44" height="99" rx="3"/>
+      <rect class="tr-bar" x="321" y="84"  width="44" height="66" rx="3"/>
+      <rect class="tr-bar" x="400" y="73"  width="44" height="77" rx="3"/>
+      <rect class="tr-bar" x="480" y="95"  width="44" height="55" rx="3"/>
+      <rect class="tr-bar" x="559" y="84"  width="44" height="66" rx="3"/>
+      <rect class="tr-bar" x="639" y="106" width="44" height="44" rx="3"/>
+      <rect class="tr-bar" x="719" y="95"  width="44" height="55" rx="3"/>
+      <rect class="tr-bar" x="798" y="117" width="44" height="33" rx="3"/>
+      <rect class="tr-bar" x="878" y="106" width="44" height="44" rx="3"/>
+
+      <line class="tr-mark" x1="462" y1="30" x2="462" y2="158"/>
+      <text class="tr-mark-lbl" x="470" y="38">9 июля — убрал жареное</text>
+
+      <polyline class="tr-line"
+        points="104,94 183,97 263,91 343,99 422,96 502,107 581,105 661,113 741,109 820,117 900,114"/>
+      <g class="tr-pt">
+        <circle cx="104" cy="94" r="3"/><circle cx="183" cy="97" r="3"/><circle cx="263" cy="91" r="3"/>
+        <circle cx="343" cy="99" r="3"/><circle cx="422" cy="96" r="3"/><circle cx="502" cy="107" r="3"/>
+        <circle cx="581" cy="105" r="3"/><circle cx="661" cy="113" r="3"/><circle cx="741" cy="109" r="3"/>
+        <circle cx="820" cy="117" r="3"/><circle cx="900" cy="114" r="3"/>
+      </g>
+      <g class="tr-lbl">
+        <text x="223" y="172" text-anchor="middle">июнь</text>
+        <text x="581" y="172" text-anchor="middle">июль</text>
+        <text x="860" y="172" text-anchor="middle">август</text>
+      </g>
+    </svg>
+
+    <div class="compare">
+      <div class="cmp"><div class="k">Эпизодов на 10 приёмов</div><div class="v">3.8</div><div class="d good">−38 % к прошлому периоду</div></div>
+      <div class="cmp"><div class="k">Средняя тяжесть</div><div class="v">3.6</div><div class="d good">−1.2 балла</div></div>
+      <div class="cmp"><div class="k">Чистых дней подряд, макс</div><div class="v">9</div><div class="d good">было 3</div></div>
+      <div class="cmp"><div class="k">Ночных эпизодов</div><div class="v">18</div><div class="d bad">+4</div></div>
+    </div>
+    <p class="hint">Столбцы — число эпизодов за неделю, линия — средняя тяжесть по десятибалльной шкале. Вертикальная отметка поставлена командой <code>--split-at 2026-07-09</code>: она делит период надвое и сравнивает половины.</p>
+  </div>
+
+  <div class="card">
+    <h3>Тяжесть по дням</h3>
     <div class="heatmap">
       <i></i><i class="l1"></i><i></i><i class="l2"></i><i class="l3"></i><i></i><i class="l1"></i>
       <i class="l2"></i><i></i><i></i><i class="l1"></i><i class="l3"></i><i class="l2"></i><i></i>
@@ -217,19 +305,21 @@ footer.colophon{margin-top:64px; padding-top:22px; border-top:1px solid var(--bo
       <i class="l3"></i><i></i><i class="l1"></i><i class="l2"></i><i class="l4"></i><i></i><i></i>
       <i></i><i></i><i class="l2"></i><i class="l1"></i><i></i><i class="l2"></i><i class="l1"></i>
       <i class="l2"></i><i class="l1"></i><i></i><i></i><i class="l1"></i><i class="l3"></i><i></i>
-      <i class="l2"></i><i class="l3"></i><i></i><i class="l2"></i><i class="l4"></i><i class="l1"></i><i></i>
+      <i></i><i class="l1"></i><i></i><i class="l2"></i><i></i><i class="l1"></i><i></i>
+      <i class="l1"></i><i></i><i></i><i class="l1"></i><i class="l2"></i><i></i><i></i>
+      <i></i><i class="l1"></i><i></i><i></i><i class="l1"></i><i class="l2"></i><i></i>
+      <i class="l1"></i><i></i><i class="l2"></i><i></i><i></i><i class="l1"></i><i></i>
     </div>
     <div class="hm-legend">
       <span>меньше</span><i style="background:var(--h0)"></i><i style="background:var(--h1)"></i>
       <i style="background:var(--h2)"></i><i style="background:var(--h3)"></i><i style="background:var(--h4)"></i><span>больше</span>
-      <span style="margin-left:auto">строка — день недели, столбец — неделя</span>
+      <span style="margin-left:auto">строка — день недели, столбец — неделя периода</span>
     </div>
   </div>
 
   <div class="card">
-    <h3>Еда и симптомы по часам</h3>
+    <h3>Еда и симптомы по часам <span class="tag">последние 7 дней периода</span></h3>
     <svg class="timeline" viewBox="0 0 960 292" role="img" aria-label="Таймлайн приёмов пищи и симптомов за неделю">
-      <!-- сетка часов -->
       <g class="tl-axis">
         <text x="64" y="14">0</text><text x="174" y="14">3</text><text x="284" y="14">6</text>
         <text x="394" y="14">9</text><text x="504" y="14">12</text><text x="614" y="14">15</text>
@@ -243,7 +333,6 @@ footer.colophon{margin-top:64px; padding-top:22px; border-top:1px solid var(--bo
         <line x1="940" y1="22" x2="940" y2="284"/>
       </g>
 
-      <!-- Пн 10 -->
       <text class="tl-day" x="0" y="52">пн 10</text>
       <line class="tl-track" x1="64" y1="48" x2="940" y2="48"/>
       <circle class="tl-meal" cx="394" cy="48" r="4.5"/><circle class="tl-meal" cx="577" cy="48" r="4.5"/>
@@ -251,31 +340,27 @@ footer.colophon{margin-top:64px; padding-top:22px; border-top:1px solid var(--bo
       <line class="tl-link" x1="778" y1="48" x2="834" y2="48"/>
       <rect class="tl-sym" x="831" y="36" width="6" height="12" rx="1"/>
 
-      <!-- Вт 11 -->
       <text class="tl-day" x="0" y="86">вт 11</text>
       <line class="tl-track" x1="64" y1="82" x2="940" y2="82"/>
       <circle class="tl-meal" cx="376" cy="82" r="4.5"/><circle class="tl-meal" cx="541" cy="82" r="4.5"/>
       <circle class="tl-meal flag" cx="797" cy="82" r="5"/>
-      <line class="tl-link" x1="797" y1="82" x2="871" y2="82"/>
+      <line class="tl-link guess" x1="797" y1="82" x2="871" y2="82"/>
       <rect class="tl-sym" x="868" y="64" width="6" height="18" rx="1"/>
       <rect class="tl-sym" x="923" y="73" width="6" height="9" rx="1"/>
 
-      <!-- Ср 12 -->
       <text class="tl-day" x="0" y="120">ср 12</text>
       <line class="tl-track" x1="64" y1="116" x2="940" y2="116"/>
       <circle class="tl-meal" cx="394" cy="116" r="4.5"/><circle class="tl-meal" cx="577" cy="116" r="4.5"/>
       <circle class="tl-meal" cx="760" cy="116" r="4.5"/>
 
-      <!-- Чт 13 -->
       <text class="tl-day" x="0" y="154">чт 13</text>
       <line class="tl-track" x1="64" y1="150" x2="940" y2="150"/>
       <circle class="tl-meal flag" cx="357" cy="150" r="5"/><circle class="tl-meal flag" cx="504" cy="150" r="5"/>
       <circle class="tl-meal flag" cx="724" cy="150" r="5"/>
-      <line class="tl-link" x1="504" y1="150" x2="614" y2="150"/>
+      <line class="tl-link guess" x1="504" y1="150" x2="614" y2="150"/>
       <rect class="tl-sym" x="611" y="135" width="6" height="15" rx="1"/>
       <rect class="tl-sym" x="831" y="135" width="6" height="15" rx="1"/>
 
-      <!-- Пт 14 -->
       <text class="tl-day" x="0" y="188">пт 14</text>
       <line class="tl-track" x1="64" y1="184" x2="940" y2="184"/>
       <circle class="tl-meal" cx="412" cy="184" r="4.5"/><circle class="tl-meal" cx="559" cy="184" r="4.5"/>
@@ -283,14 +368,12 @@ footer.colophon{margin-top:64px; padding-top:22px; border-top:1px solid var(--bo
       <line class="tl-link" x1="871" y1="184" x2="925" y2="184"/>
       <rect class="tl-sym" x="922" y="163" width="6" height="21" rx="1"/>
 
-      <!-- Сб 15 -->
       <text class="tl-day" x="0" y="222">сб 15</text>
       <line class="tl-track" x1="64" y1="218" x2="940" y2="218"/>
       <circle class="tl-meal" cx="467" cy="218" r="4.5"/><circle class="tl-meal flag" cx="650" cy="218" r="5"/>
       <circle class="tl-meal" cx="797" cy="218" r="4.5"/>
       <rect class="tl-sym" x="538" y="209" width="6" height="9" rx="1"/>
 
-      <!-- Вс 16 -->
       <text class="tl-day" x="0" y="256">вс 16</text>
       <line class="tl-track" x1="64" y1="252" x2="940" y2="252"/>
       <circle class="tl-meal" cx="431" cy="252" r="4.5"/><circle class="tl-meal" cx="577" cy="252" r="4.5"/>
@@ -300,33 +383,40 @@ footer.colophon{margin-top:64px; padding-top:22px; border-top:1px solid var(--bo
       <span><i class="dot"></i> приём пищи</span>
       <span><i class="dot flag"></i> содержит продукт-подозреваемый</span>
       <span><i class="bar"></i> симптом, высота = тяжесть 0–10</span>
-      <span>пунктир — связка, подтверждённая твоим reply</span>
+      <span><i class="ln"></i> связь подтверждена</span>
+      <span><i class="ln guess"></i> связь предположена по окну</span>
     </div>
   </div>
 
   <div class="card">
-    <h3>Подозреваемые продукты <span class="tag">по всей истории · 86 дней</span></h3>
+    <h3>Подозреваемые продукты <span class="tag">за период · 77 дней</span></h3>
     <table class="suspects">
       <thead><tr>
         <th>Продукт</th><th>Приёмов</th><th>С симптомом</th><th>P(симптом)</th>
-        <th>Отношение к базовой</th><th>Медиан. задержка</th><th>Оценка</th>
+        <th>Отношение</th><th>Задержка</th><th>Подтверждено</th><th>Оценка</th>
       </tr></thead>
       <tbody>
         <tr><td class="food">Картофель жареный</td><td class="num">11</td><td class="num">8</td><td class="num">73 %</td>
-            <td class="liftbar"><em style="width:100%"></em><b>2.4×</b></td><td class="num">2 ч 10 м</td><td><span class="tag solid">сильный сигнал</span></td></tr>
+            <td class="liftbar"><em style="width:100%"></em><b>2.4×</b></td><td class="num">2 ч 10 м</td>
+            <td class="conf"><b>5</b> / 8</td><td><span class="tag solid">сильный сигнал</span></td></tr>
         <tr><td class="food">Пиво</td><td class="num">7</td><td class="num">5</td><td class="num">71 %</td>
-            <td class="liftbar"><em style="width:96%"></em><b>2.3×</b></td><td class="num">1 ч 40 м</td><td><span class="tag solid">сильный сигнал</span></td></tr>
+            <td class="liftbar"><em style="width:96%"></em><b>2.3×</b></td><td class="num">1 ч 40 м</td>
+            <td class="conf"><b>3</b> / 5</td><td><span class="tag solid">сильный сигнал</span></td></tr>
         <tr><td class="food">Кофе натощак</td><td class="num">19</td><td class="num">11</td><td class="num">58 %</td>
-            <td class="liftbar"><em style="width:79%"></em><b>1.9×</b></td><td class="num">55 м</td><td><span class="tag solid">сильный сигнал</span></td></tr>
+            <td class="liftbar"><em style="width:79%"></em><b>1.9×</b></td><td class="num">55 м</td>
+            <td class="conf"><b>4</b> / 11</td><td><span class="tag solid">сильный сигнал</span></td></tr>
         <tr><td class="food">Пицца</td><td class="num">6</td><td class="num">4</td><td class="num">67 %</td>
-            <td class="liftbar"><em style="width:88%"></em><b>2.1×</b></td><td class="num">3 ч 05 м</td><td><span class="tag weak">слабый · p = 0.06</span></td></tr>
+            <td class="liftbar"><em style="width:88%"></em><b>2.1×</b></td><td class="num">3 ч 05 м</td>
+            <td class="conf">0 / 4</td><td><span class="tag">слабый · p = 0.06</span></td></tr>
         <tr><td class="food">Шаурма</td><td class="num">4</td><td class="num">3</td><td class="num">75 %</td>
-            <td class="liftbar"><em style="width:100%"></em><b>2.4×</b></td><td class="num">4 ч 20 м</td><td><span class="tag weak">мало данных · n = 4</span></td></tr>
+            <td class="liftbar"><em style="width:100%"></em><b>2.4×</b></td><td class="num">4 ч 20 м</td>
+            <td class="conf"><b>1</b> / 3</td><td><span class="tag">мало данных · n = 4</span></td></tr>
         <tr><td class="food">Творог</td><td class="num">14</td><td class="num">4</td><td class="num">29 %</td>
-            <td class="liftbar"><em style="width:39%"></em><b>0.9×</b></td><td class="num">—</td><td><span class="tag">связи нет</span></td></tr>
+            <td class="liftbar"><em style="width:39%"></em><b>0.9×</b></td><td class="num">—</td>
+            <td class="conf">0 / 4</td><td><span class="tag">связи нет</span></td></tr>
       </tbody>
     </table>
-    <p class="hint">Базовая частота симптома после произвольного приёма пищи — <b>31 %</b>. «Отношение к базовой» (lift) показывает, во сколько раз чаще симптом случается именно после этого продукта.</p>
+    <p class="hint">Базовая частота симптома после произвольного приёма пищи в этом периоде — <b>31 %</b>. «Отношение» (lift) показывает, во сколько раз чаще симптом случается именно после этого продукта. «Подтверждено» — сколько связок опираются на твой reply или прямое упоминание в тексте, а не на попадание в окно.</p>
   </div>
 
   <div class="card">
@@ -350,6 +440,29 @@ footer.colophon{margin-top:64px; padding-top:22px; border-top:1px solid var(--bo
   </div>
 
   <div class="card">
+    <h3>Окна экспозиции <span class="tag ok">откалиброваны по 23 подтверждённым связкам</span></h3>
+    <div class="cal-scale"><span>0 ч</span><span>6 ч</span><span>12 ч</span><span>18 ч</span><span>24 ч</span></div>
+    <div class="calib">
+      <div class="cal-row">
+        <span>Изжога, рефлюкс</span>
+        <span class="cal-track"><i class="cal-def" style="left:0%;width:17%"></i><i class="cal-new" style="left:2%;width:10%"></i></span>
+        <span class="cal-val">0:30 – 3:00 <br>было 0:00 – 4:00</span>
+      </div>
+      <div class="cal-row">
+        <span>Вздутие, газы</span>
+        <span class="cal-track"><i class="cal-def" style="left:4%;width:29%"></i><i class="cal-new" style="left:8%;width:21%"></i></span>
+        <span class="cal-val">2:00 – 7:00 <br>было 1:00 – 8:00</span>
+      </div>
+      <div class="cal-row">
+        <span>Диарея, боль</span>
+        <span class="cal-track"><i class="cal-def" style="left:8%;width:92%"></i><i class="cal-new" style="left:17%;width:58%"></i></span>
+        <span class="cal-val">4:00 – 18:00 <br>было 2:00 – 24:00</span>
+      </div>
+    </div>
+    <p class="hint">Серым — окно из общей физиологии, оранжевым — рассчитанное по твоим подтверждённым связкам. Reply случается редко, но каждый уточняет окно, а суженное окно режет ложные совпадения по всей остальной выборке — включая те записи, где ты ничего не подтверждал. Применить: <code>diary stats gi --calibrate-windows</code>.</p>
+  </div>
+
+  <div class="card">
     <h3>Переносится хорошо</h3>
     <div class="chips clean">
       <span>Гречка <b>14</b></span><span>Куриная грудка <b>17</b></span><span>Рис <b>13</b></span>
@@ -359,27 +472,28 @@ footer.colophon{margin-top:64px; padding-top:22px; border-top:1px solid var(--bo
   </div>
 
   <div class="card">
-    <h3>Симптомы за 86 дней</h3>
+    <h3>Симптомы за период</h3>
     <div class="totals">
-      <div class="total"><b>23</b><span>изжога</span><span class="sev">средняя тяжесть 4.1</span></div>
-      <div class="total"><b>14</b><span>рефлюкс</span><span class="sev">средняя тяжесть 5.6</span></div>
-      <div class="total"><b>11</b><span>вздутие</span><span class="sev">средняя тяжесть 3.8</span></div>
-      <div class="total"><b>8</b><span>отрыжка</span><span class="sev">средняя тяжесть 2.5</span></div>
+      <div class="total"><b>31</b><span>изжога</span><span class="sev">средняя тяжесть 4.1</span></div>
+      <div class="total"><b>19</b><span>рефлюкс</span><span class="sev">средняя тяжесть 5.6</span></div>
+      <div class="total"><b>15</b><span>вздутие</span><span class="sev">средняя тяжесть 3.8</span></div>
+      <div class="total"><b>11</b><span>отрыжка</span><span class="sev">средняя тяжесть 2.5</span></div>
     </div>
   </div>
 
   <p class="note" style="margin-top:18px">
     <b>Как это читать.</b> Это дневник наблюдений, а не диагностика. Совпадение во времени не означает причину:
-    чем больше продуктов проверяется, тем выше шанс случайной «находки» — при шести продуктах и пороге p&nbsp;=&nbsp;0.05
-    примерно одно срабатывание из двадцати будет ложным. Строки с пометкой «мало данных» показаны не как вывод,
-    а чтобы было видно, чего именно не хватает для вывода. Если сигнал устойчив — это повод обсудить его с врачом,
+    в этом отчёте проверено <b>34 гипотезы</b> (продукты и свойства), и при пороге p&nbsp;=&nbsp;0.05 примерно
+    одна-две из них сработают случайно. Строки с пометкой «мало данных» показаны не как вывод, а чтобы было
+    видно, чего именно не хватает. Чем короче выбранный период, тем меньше наблюдений и тем осторожнее стоит
+    относиться к находкам. Если сигнал держится на разных периодах — это повод обсудить его с врачом,
     а не повод самому исключать продукты.
   </p>
 </section>
 
-<!-- ══ Sections/Ideas.razor ═══════════════════════════════ -->
+<!-- ══ Modules/Notes/Sections/Ideas.razor ═════════════════ -->
 <section>
-  <div class="sec-head"><h2>Идеи</h2><span class="count">5 за неделю</span><div class="rule"></div></div>
+  <div class="sec-head"><h2>Идеи</h2><span class="count">5 за последнюю неделю · 63 за период</span><div class="rule"></div></div>
   <div class="cards">
     <article class="idea">
       <h3>Линтер для промптов</h3>
@@ -402,16 +516,16 @@ footer.colophon{margin-top:64px; padding-top:22px; border-top:1px solid var(--bo
       <footer><span class="theme">тексты</span><span class="badge-do">сделать</span><time>пт, 09:50</time></footer>
     </article>
     <article class="idea">
-      <h3>Автосинк дневника в Obsidian</h3>
-      <p>Отчёт хорош раз в неделю, но заметки хочется искать сразу. Экспорт записей в markdown-хранилище с обратными ссылками на исходные сообщения.</p>
-      <footer><span class="theme">инструменты</span><span class="mic">🎙 0:51</span><time>сб, 13:31</time></footer>
+      <h3>Модуль «сон» в дневник</h3>
+      <p>Если сопоставить часы сна с ночными эпизодами рефлюкса, может вылезти связь. Данные и так наговариваются, надо только завести категорию.</p>
+      <footer><span class="theme">этот проект</span><span class="badge-do">сделать</span><span class="mic">🎙 0:51</span><time>сб, 13:31</time></footer>
     </article>
   </div>
 </section>
 
-<!-- ══ Sections/Questions.razor ═══════════════════════════ -->
+<!-- ══ Modules/Notes/Sections/Questions.razor ═════════════ -->
 <section>
-  <div class="sec-head"><h2>Вопросы</h2><span class="count">6 накопилось</span><div class="rule"></div></div>
+  <div class="sec-head"><h2>Вопросы</h2><span class="count">6 без ответа</span><div class="rule"></div></div>
   <p class="lead">Ответы сгенерированы локальной моделью и намеренно короткие — как подсказка, с чего начать, а не как источник истины.</p>
 
   <div class="qgroup">
@@ -430,7 +544,7 @@ footer.colophon{margin-top:64px; padding-top:22px; border-top:1px solid var(--bo
     <h3>Данные и статистика</h3>
     <ul class="qlist">
       <li><i class="box"></i><div><span class="q">Как работает WAL в SQLite и почему он тут включён?</span>
-        <span class="a">Запись идёт в отдельный журнал, читатели не блокируют писателя. Для схемы «демон пишет, CLI читает» это ровно то, что нужно.</span></div><time>вт</time></li>
+        <span class="a">Запись идёт в отдельный журнал, читатели не блокируют писателя. Для схемы «долгий прогон пишет, второй процесс читает» это ровно то, что нужно.</span></div><time>вт</time></li>
       <li><i class="box"></i><div><span class="q">Что такое lift и чем он отличается от корреляции?</span>
         <span class="a">Отношение условной вероятности к безусловной: во сколько раз событие вероятнее при условии. В отличие от коэффициента корреляции работает с бинарными признаками и читается напрямую.</span></div><time>чт</time></li>
     </ul>
@@ -439,8 +553,8 @@ footer.colophon{margin-top:64px; padding-top:22px; border-top:1px solid var(--bo
   <div class="qgroup">
     <h3>Telegram</h3>
     <ul class="qlist">
-      <li><i class="box"></i><div><span class="q">Как долго живёт <code>file_id</code> и можно ли качать аудио потом?</span>
-        <span class="a">Сам <code>file_id</code> стабилен для бота, но ссылка от <code>getFile</code> временная. Поэтому файлы забираются сразу при приёме — отложенное скачивание ненадёжно.</span></div><time>сб</time></li>
+      <li><i class="box"></i><div><span class="q">Правда ли, что через MTProto доступна вся история канала?</span>
+        <span class="a">Да, <code>messages.getHistory</code> идёт вглубь порциями, а медиа лежит в облаке и качается спустя годы. Ограничение в 24 часа — это про непрочитанные апдейты Bot API, а не про историю.</span></div><time>сб</time></li>
     </ul>
   </div>
 </section>
@@ -449,7 +563,7 @@ footer.colophon{margin-top:64px; padding-top:22px; border-top:1px solid var(--bo
 <section>
   <div class="sec-head"><h2>Приложение</h2><div class="rule"></div></div>
   <details class="rawlog">
-    <summary>Сырой лог за неделю — 47 сообщений, транскрипты, исходные файлы</summary>
+    <summary>Сырой лог за последнюю неделю — 47 сообщений, транскрипты, исходные файлы</summary>
     <div class="log">
       <div class="entry"><time>пн, 19:34</time><div>
         <div class="txt">«Поужинал жарёхой с котлетой, ну и хлеба пару кусков»</div>
@@ -469,18 +583,22 @@ footer.colophon{margin-top:64px; padding-top:22px; border-top:1px solid var(--bo
       </div></div>
       <div class="entry"><time>чт, 15:04</time><div>
         <div class="txt">«Вздутие сильное, пятёрка. И урчит»</div>
-        <div class="meta"><span class="tag">🎙 0:05</span><span class="tag">→ симптом</span><span class="tag">вздутие · 5/10</span><span>окно 1–8 ч → шаурма</span></div>
+        <div class="meta"><span class="tag">🎙 0:05</span><span class="tag">→ симптом</span><span class="tag">вздутие · 5/10</span><span>окно 2–7 ч → шаурма (предположение)</span></div>
       </div></div>
       <div class="entry"><time>пт, 22:00</time><div>
         <div class="txt">«Пиво выпил, бутылку. Вчера вечером ещё картошку жарил, забыл записать»</div>
-        <div class="meta"><span class="tag">🎙 0:14</span><span class="tag">→ еда ×2</span><span class="tag weak">относительное время: «вчера вечером» → чт 20:00</span></div>
+        <div class="meta"><span class="tag">🎙 0:14</span><span class="tag">→ еда ×2</span><span class="tag">«вчера вечером» → чт 20:00</span></div>
+      </div></div>
+      <div class="entry"><time>сб, 09:12</time><div>
+        <div class="txt">«Изжога с утра, тройка. Наверное после вчерашнего пива»</div>
+        <div class="meta"><span class="tag">🎙 0:07</span><span class="tag">→ симптом</span><span class="tag solid">упоминание в тексте → пиво, пт 22:00</span><span class="tag">изжога · 3/10</span></div>
       </div></div>
     </div>
   </details>
 </section>
 
 <footer class="colophon">
-  <span>Собрано локально · Qwen3-8B @ LM Studio · Whisper large-v3-turbo · промпты v3</span>
+  <span>reports/me/2026-08-17-summer.html · LM Studio · Whisper large-v3-turbo · промпты v3 · модули: gi, notes</span>
   <span>Ни один байт не покидал эту машину</span>
 </footer>
 
