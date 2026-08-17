@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Diary.Modules.Notes;
 
-public sealed record AnswerReport(int Answered, int Failed, int AlreadyHadAnswers);
+public sealed record AnswerReport(int Answered, int Failed, int AlreadyHadAnswers, bool Interrupted = false);
 
 /// <summary>
 /// Отвечает на накопленные вопросы. Единственный шаг, где модели разрешено быть
@@ -65,6 +65,15 @@ public sealed class AnswerQuestionsHandler(
 
                 entry.UpdatePayload(payload with { Answer = answer.Trim() });
                 answered++;
+            }
+            catch (LlmUnavailableException ex)
+            {
+                // Вопрос без ответа остаётся вопросом без ответа — следующий запуск
+                // подберёт его сам, без всякого вмешательства.
+                logger.LogWarning("Модель недоступна ({Reason}). Ответы отложены.", ex.Message);
+
+                await uow.SaveChangesAsync(ct);
+                return new AnswerReport(answered, failed, skipped, Interrupted: true);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {

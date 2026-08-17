@@ -207,6 +207,13 @@ public sealed class Runner(IHost host)
                     $"{subject.Key}: разобрано {report.Messages} сообщений → {report.Entries} записей, " +
                     $"пропущено {report.Skipped}, ошибок {report.Failed}.");
             }
+
+            if (report.Interrupted)
+            {
+                Console.WriteLine(
+                    $"{subject.Key}: модель недоступна — остальное осталось в очереди " +
+                    "и разберётся при следующем запуске.");
+            }
         }
 
         return 0;
@@ -301,7 +308,11 @@ public sealed class Runner(IHost host)
             var affectedMessages = await messages.GetByPeriodAsync(period, ct);
             await entries.RemoveBySourceAsync([.. affectedMessages.Select(m => m.Id)], ct);
 
-            var count = await messages.ResetStateAsync(ProcessingState.Extracted, state, since, ct);
+            // Провалившиеся возвращаются вместе с разобранными: чаще всего они упали
+            // не по своей вине, и оставлять их вне очереди — значит терять данные молча.
+            var count = await messages.ResetStateAsync(ProcessingState.Extracted, state, since, ct)
+                      + await messages.ResetStateAsync(ProcessingState.Failed, state, since, ct);
+
             await uow.SaveChangesAsync(ct);
 
             Console.WriteLine($"{subject.Key}: возвращено в обработку {count} сообщений (в {state}).");

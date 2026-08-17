@@ -6,7 +6,11 @@ using Microsoft.Extensions.Logging;
 
 namespace Diary.Application.UseCases;
 
-public sealed record ExtractReport(int Messages, int Entries, int Failed, int Skipped);
+/// <param name="Interrupted">
+/// Модель оказалась недоступна, и шаг прервался. Необработанное осталось в очереди
+/// нетронутым и разберётся при следующем запуске.
+/// </param>
+public sealed record ExtractReport(int Messages, int Entries, int Failed, int Skipped, bool Interrupted = false);
 
 /// <summary>
 /// Превращает расшифровки в записи дневника: сегментация — потом извлечение по категориям.
@@ -39,8 +43,9 @@ public sealed class ExtractHandler(
 
         var baseVersion = llm.ModelFor(LlmRole.Extraction);
         int handled = 0, produced = 0, failed = 0, skipped = 0;
+        var interrupted = false;
 
-        while (!ct.IsCancellationRequested)
+        while (!ct.IsCancellationRequested && !interrupted)
         {
             var pending = await messages.GetByStateAsync(ProcessingState.Transcribed, batchSize, ct);
             if (pending.Count == 0)
@@ -100,6 +105,17 @@ public sealed class ExtractHandler(
                     message.MarkExtracted();
                     handled++;
                 }
+                catch (LlmUnavailableException ex)
+                {
+                    // Сообщение остаётся в очереди: «модель была выключена» не должно
+                    // превращаться в «данные сломаны» и требовать ручного возврата.
+                    logger.LogWarning(
+                        "Модель недоступна ({Reason}). Разбор прерван, {Count} сообщений ждут следующего запуска.",
+                        ex.Message, pending.Count - handled);
+
+                    interrupted = true;
+                    break;
+                }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     logger.LogError(ex, "Не удалось разобрать сообщение {Id}.", message.TelegramMessageId);
@@ -108,6 +124,8 @@ public sealed class ExtractHandler(
                 }
             }
 
+            // Сохраняем и при обрыве: то, что успели разобрать до падения сервера,
+            // разбирать заново незачем.
             await uow.SaveChangesAsync(ct);
 
             if (pending.Count < batchSize)
@@ -116,7 +134,7 @@ public sealed class ExtractHandler(
             }
         }
 
-        return new ExtractReport(handled, produced, failed, skipped);
+        return new ExtractReport(handled, produced, failed, skipped, interrupted);
     }
 
     private async Task<IReadOnlyList<EntryFragment>> SegmentAsync(

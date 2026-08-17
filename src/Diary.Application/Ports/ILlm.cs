@@ -28,9 +28,25 @@ public interface IStructuredCompletion
 }
 
 /// <summary>Модель ответила не тем, что требует схема, и починить это не удалось.</summary>
+/// <remarks>
+/// Это <b>постоянная</b> ошибка: повтор через час ничего не изменит, виноват промпт
+/// или модель. Сообщение уходит в <c>Failed</c> и ждёт человека.
+/// </remarks>
 public sealed class StructuredCompletionException(string message, string? rawResponse = null, Exception? inner = null)
     : Exception(message, inner)
 {
     /// <summary>Сырой ответ сохраняется: по нему видно, промпт виноват или модель.</summary>
     public string? RawResponse { get; } = rawResponse;
 }
+
+/// <summary>
+/// Сервер с моделью недоступен: не запущен, не отвечает, перегружен.
+/// </summary>
+/// <remarks>
+/// Это <b>временная</b> ошибка, и разница принципиальна. Пометить такие сообщения
+/// как провалившиеся — значит превратить «LM Studio была выключена» в «данные сломаны»
+/// и потребовать ручного вмешательства там, где достаточно подождать. Поэтому шаг
+/// прерывается, а сообщения остаются в очереди нетронутыми.
+/// </remarks>
+public sealed class LlmUnavailableException(string message, Exception? inner = null)
+    : Exception(message, inner);

@@ -1,4 +1,4 @@
-using System.Net.Http.Json;
+﻿using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
@@ -139,14 +139,46 @@ public sealed class LmStudioChatClient : IDisposable
             body["tool_choice"] = "auto";
         }
 
-        using var response = await _http.PostAsJsonAsync("chat/completions", body, Json, ct);
-
-        if (!response.IsSuccessStatusCode)
+        HttpResponseMessage response;
+        try
         {
-            var error = await response.Content.ReadAsStringAsync(ct);
-            throw new StructuredCompletionException(
-                $"LM Studio ответил {(int)response.StatusCode}: {Shorten(error)}", error);
+            response = await _http.PostAsJsonAsync("chat/completions", body, Json, ct);
         }
+        catch (HttpRequestException ex)
+        {
+            // Сервер не поднят или сеть отвалилась — ждать, а не сдаваться.
+            throw new LlmUnavailableException(
+                $"Модель недоступна по адресу {_http.BaseAddress}: {ex.Message}", ex);
+        }
+        catch (TaskCanceledException ex) when (!ct.IsCancellationRequested)
+        {
+            throw new LlmUnavailableException(
+                $"Модель не ответила за {_http.Timeout.TotalSeconds:F0} с — вероятно, занята.", ex);
+        }
+
+        using (response)
+        {
+            if (!response.IsSuccessStatusCode)
+            {
+                var error = await response.Content.ReadAsStringAsync(ct);
+
+                // 5xx и 429 — это «попробуй позже», а 4xx — «ты неправильно спросил».
+                if ((int)response.StatusCode >= 500 || (int)response.StatusCode == 429)
+                {
+                    throw new LlmUnavailableException(
+                        $"Сервер модели ответил {(int)response.StatusCode}: {Shorten(error)}");
+                }
+
+                throw new StructuredCompletionException(
+                    $"LM Studio ответил {(int)response.StatusCode}: {Shorten(error)}", error);
+            }
+
+            return await ReadReplyAsync(response, ct);
+        }
+    }
+
+    private static async Task<ChatReply> ReadReplyAsync(HttpResponseMessage response, CancellationToken ct)
+    {
 
         var payload = await response.Content.ReadFromJsonAsync<JsonNode>(Json, ct);
         var message = payload?["choices"]?[0]?["message"];
@@ -193,3 +225,4 @@ public sealed class LmStudioChatClient : IDisposable
 
     public void Dispose() => _http.Dispose();
 }
+
